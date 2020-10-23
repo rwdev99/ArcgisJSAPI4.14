@@ -1,0 +1,14 @@
+{
+    "include": [
+        "src"
+    ],
+    "compilerOptions": {
+        "moduleResolution": "node",
+        "esModuleInterop":true,
+        "sourceMap": true,
+        "target":"es5",
+        "module":"es6",
+        "outDir": "dist",
+        "lib": ["es2015","dom"],
+    }
+}
