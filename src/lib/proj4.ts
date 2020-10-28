@@ -1,4 +1,5 @@
 import Proj4js from "proj4"
+
 /**
  * @see http://help.arcgis.com/en/arcims/10.0/mainhelp/mergedProjects/ArcXMLGuide/elements/pcs.htm#102319
  * 
@@ -12,11 +13,12 @@ const defs = {
     'EPSG:3826':'+title=TWD97 TM2+proj=tmerc +lat_0=0 +lon_0=121 +k=0.9999 +x_0=250000 +y_0=0 +ellps=GRS80 +units=���� +no_defs',
     'EPSG:3828':'+title=TWD67 TM2+proj=tmerc +lat_0=0 +lon_0=121 +k=0.9999 +x_0=250000 +y_0=0 +ellps=aust_SA +units=m +towgs84=-752,-358,-179,-0.0000011698,0.0000018398,0.0000009822,0.00002329 +no_defs',
     'EPSG:4269':'+title=NAD83 (long/lat) +proj=longlat +a=6378137.0 +b=6356752.31414036 +ellps=GRS80 +datum=NAD83 +units=degrees',
+    "EPSG:3857":"+proj=merc +a=6378137 +b=6378137 +lat_ts=0.0 +lon_0=0.0 +x_0=0.0 +y_0=0 +k=1.0 +units=m +nadgrids=@null +no_defs",
     "EPSG:900913":"+proj=merc +a=6378137 +b=6378137 +lat_ts=0.0 +lon_0=0.0 +x_0=0.0 +y_0=0 +k=1.0 +units=m +nadgrids=@null +no_defs",
     "EPSG:4302":"+title=Trinidad 1903 EPSG:4302 (7 param datum shift) +proj=longlat +a=6378293.63683822 +b=6356617.979337744 +towgs84=-61.702,284.488,472.052,0,0,0,0",
     "EPSG:4272":"+title=NZGD49 +proj=longlat +ellps=intl +datum=nzgd49 +no_defs",
     "EPSG:42304":"+title=Atlas of Canada, LCC +proj=lcc +lat_1=49 +lat_2=77 +lat_0=49 +lon_0=-95 +x_0=0 +y_0=0 +ellps=GRS80 +datum=NAD83 +units=m +no_defs",
-    // "EPSG:3825": "+title=�G�פ��a�GTWD97 TM2 ��� +proj=tmerc +lat_0=0 +lon_0=119 +k=0.9999 +x_0=250000 +y_0=0 +ellps=GRS80 +units=���� +no_defs",
+    "EPSG:3825": "+title=�G�פ��a�GTWD97 TM2 ��� +proj=tmerc +lat_0=0 +lon_0=119 +k=0.9999 +x_0=250000 +y_0=0 +ellps=GRS80 +units=���� +no_defs",
     // "EPSG:4139": "+title=Puerto Rico EPSG:4139 (3 param datum shift) +proj=longlat +towgs84 = 11,72,-101,0,0,0,0 +a=6378206.4 +b=6356583.8",
     // "EPSG:4181": "+title=Luxembourg 1930 EPSG:4181 (7 param datum shift) +proj=longlat +towgs84=-193,13.7,-39.3,-0.41,-2.933,2.688,0.43 +a=6378388.0, +b=6356911.94612795",
     // "EPSG:21781": "+title=CH1903 / LV03 +proj=somerc +lat_0=46.95240555555556 +lon_0=7.439583333333333 +x_0=600000 +y_0=200000 +ellps=bessel +towgs84=674.374,15.056,405.346,0,0,0,0 +units=m +no_defs",
@@ -31,15 +33,29 @@ const defs = {
 
 Proj4js.defs(Object.keys(defs).map(k=>([k,defs[k]])))
 
-export function proj(fromEPSG:string,toEPSG:string,coords:number[]):number[]{
-    return Proj4js(fromEPSG,toEPSG).forward(coords)
+
+export const proj = (fromEPSG:string|number,toEPSG:string|number,coords:number[]):number[]=>{
+    const WKID = {
+        102441:"EPSG:3828",
+        // 102442:"EPSG:3827",
+        102443:"EPSG:3826",
+        102444:"EPSG:3825",
+        3857:"EPSG:900913",
+        102100:"EPSG:900913",
+        4326:"EPSG:4326"
+    }
+    fromEPSG = WKID[fromEPSG] || fromEPSG
+    toEPSG = WKID[toEPSG] || fromEPSG
+    return Proj4js(fromEPSG as string,toEPSG as string).forward(coords)
 }
 
-export const proj67to84 = (coord:number[])=>Proj4js("EPSG:3828","EPSG:4326").forward(coord)
-export const proj97to84 = (coord:number[])=>Proj4js("EPSG:3826","EPSG:4326").forward(coord)
 
 export const proj97to67 = (coord:number[])=>Proj4js("EPSG:3826","EPSG:3828").forward(coord)
 export const proj67to97 = (coord:number[])=>Proj4js("EPSG:3826","EPSG:3828").inverse(coord)
 
-export const proj84to67 = (coord:number[])=>Proj4js("EPSG:900913","EPSG:3828").forward(coord)
-export const proj84to97 = (coord:number[])=>Proj4js("EPSG:3826","EPSG:4326").inverse(coord)
+/** EPSG:4326 refers to WGS 84 whereas EPSG:900913|EPSG:102100|EPSG:3857 refers to WGS 84 / Pseudo-Mercator. */
+export const proj97to84 = (coord:number[])=>Proj4js("EPSG:3826","EPSG:3857").forward(coord)
+export const proj84to97 = (coord:number[])=>Proj4js("EPSG:3826","EPSG:3857").inverse(coord)
+
+export const proj84to67 = (coord:number[])=>Proj4js("EPSG:3857","EPSG:3828").forward(coord)
+export const proj67to84 = (coord:number[])=>Proj4js("EPSG:3857","EPSG:3828").inverse(coord)

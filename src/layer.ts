@@ -135,8 +135,8 @@ export class LayerFactory {
     }:__layer.customLayerProperties){
 
         try{
-            console.log("[ before build lyrOpts, uncapture args ]",args)
-            // grab props esri need & alias 
+            console.log("[ addRawLayer: unexpected args ]",args)
+            
             let layerOpts:__layer.baseEsriLayerProperties&__layer.customLayerProperties = {
                 id: String(ID || args['id'] || `layer_${this._Map.layers.length}`),
                 title: LayerName || args['name'] || args['title'] || `layer_${this._Map.layers.length}`,
@@ -157,11 +157,11 @@ export class LayerFactory {
                 ImgUrl: ImgUrl || args["imgUrl"],
                 Datatype: Datatype || args["layerType"] || args["LayerType"] || args["dataType"]
             }
-            console.log("[ after build lyrOpts, layerOpts ]",layerOpts)
+            console.log("[ addRawLayer: build layerOpts ]",layerOpts)
 
-            // ensure default load layer is visible 
+            // ensure visible is true when "DefLoadLyr" is true
             if(layerOpts.DefLoadLyr) layerOpts.visible = true
-            // check not default load layer has saved or not every time
+            // check notDefaultLoadLayerProps
             if(!layerOpts.DefLoadLyr && type !=='graphiclayer'){
                 const ptr = this.notDefaultLoadLayerProps.find(tl=>tl.id == layerOpts.id)
                 if(!ptr){ // just keep
@@ -229,9 +229,9 @@ export class LayerFactory {
             this._Map.reorder(ptr,this._Map.layers.length-1)
         })
         
-        console.log("baseLayer_bucket",this.baseLayer_bucket)
-        console.log("layer_bucket",this.layer_bucket)
-        console.log("graphiclayer_bucket",this.graphiclayer_bucket)
+        console.log("[ layer_bucket ]",this.layer_bucket)
+        console.log("[ baseLayer_bucket ]",this.baseLayer_bucket)
+        console.log("[ graphiclayer_bucket ]",this.graphiclayer_bucket)
     }
 
     reorderInBucket(props:__layer.handleOption,index:number){

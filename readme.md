@@ -1,4 +1,4 @@
-# Arcgis 4.14 lib
+# Arcgis 4.14 JSAPI
 
 ## Project setup
 ```
@@ -16,15 +16,13 @@ npm run build
 ```
 
 ### Test
-* before run test , should run `tsc -w` to compile file first
+* should compile typescript files `tsc -w` ; before start unit test 
 ```
 npm run test
 ```
 
-### About
-* --
+<!-- ### About -->
 
 #### Todo :
-- [ ] 圖台 `wrdf` :  載入外部影像
-- [ ] `./misc` "載入外部影像(*.TIF、*.JPG、*.PNG、*.BMP) 與 影像定位檔(*.TFW、*.JGW、*.PGW、*.BPW)，套繪於圖台顯示
-- [ ] add UML、Document
+- [ ] `draw*.ts` to interface ? give class `Meaure` & `Search`
+- [ ] UML、Text Document

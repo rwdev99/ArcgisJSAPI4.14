@@ -35,7 +35,7 @@ export class Init {
         viewConfig:__esri.MapViewProperties
     ):Promise<Init>{
 
-        const MAP_URL = mapConfig.hasOwnProperty('portalItem') ? "WebMap" : "Map"
+        const MAP_URL = mapConfig && mapConfig.hasOwnProperty('portalItem') ? "WebMap" : "Map"
         
         const Map = (await loadModule<__esri.MapConstructor>(`esri/${MAP_URL}`))
         const View = (await loadModule<__esri.MapViewConstructor>(`esri/views/MapView`))

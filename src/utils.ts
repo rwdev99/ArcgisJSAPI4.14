@@ -1,12 +1,13 @@
 
-import { loadModules, setDefaultOptions } from 'esri-loader'
-setDefaultOptions({ version: '4.14', css: true })
+import { loadModules } from 'esri-loader'
+import {Wicket} from "./lib/wicket"
 
-export const loadModule = async <T>(url: string): Promise<T> => await loadModules([url])[0]
 export * from "./lib/proj4"
+export const loadModule = async <T>(url: string): Promise<T> => (await loadModules([url],{version: CONFIG.VERSION, css: true }))[0]
 
-export const config = {
-    GSVR_URL:"https://urbangis.hccg.gov.tw/arcgis/rest/services/Utilities/Geometry/GeometryServer"
+export const CONFIG = {
+    GSVR_URL:"https://urbangis.hccg.gov.tw/arcgis/rest/services/Utilities/Geometry/GeometryServer",
+    VERSION: "4.14"
 }
 
 export class TipText {
@@ -21,7 +22,7 @@ export class TipText {
 
         this.view.container.appendChild(this.dom)
 
-        let defaultStyle = `
+        const defaultStyle = `
             visibility:hidden;
             position:fixed;
             top:0px;
@@ -34,7 +35,6 @@ export class TipText {
             border-radius:5px;
         `
         this.dom.style.cssText = defaultStyle + style
-
     }
 
     setPosition(x: number, y: number) {
@@ -43,6 +43,8 @@ export class TipText {
     }
 
     setText(text: string, type?: "warning") {
+        this.dom.style.visibility = text === '' ? 'hidden': 'visible'
+        
         this.dom.innerText = text
         this.dom.style.background = "rgba(0,0,0,0.5)"
         this.dom.style.color = "#fff"
@@ -53,7 +55,6 @@ export class TipText {
     }
 
     destroy() {
-        //- remove all
         if (this.view.container.contains(this.dom)) {
             this.view.container.removeChild(this.dom)
         }
@@ -68,26 +69,27 @@ export class GeometryTransaction {
     SpatialReference: __esri.SpatialReferenceConstructor
     ProjectParameters: __esri.ProjectParametersConstructor
 
-    Wicket: __utils.Wkt
+    wicket: Wicket
     clientProjection: __esri.projection
-    Gsrv: __esri.GeometryService
+    gsrv: __esri.GeometryService
 
-    private async load() {
+    async load() {
 
         this.Geometry = await loadModule<__esri.GeometryConstructor>("esri/geometry/Geometry")
         this.Point = await loadModule<__esri.PointConstructor>("esri/geometry/Point")
         this.SpatialReference = await loadModule<__esri.SpatialReferenceConstructor>("esri/geometry/SpatialReference")
 
         const Gsrv = await loadModule<__esri.GeometryServiceConstructor>("esri/geometry/SpatialReference")
-        this.Gsrv = new Gsrv({ url:config.GSVR_URL })
+        this.gsrv = new Gsrv({ url:CONFIG.GSVR_URL })
 
         this.clientProjection = await loadModule<__esri.projection>("esri/geometry/projection")
         await this.clientProjection.load()
 
-        this.ProjectParameters = await loadModule<__esri.ProjectParametersConstructor>("esri/geometry/ProjectParametersConstructor")
-
-        this.Wicket = new (await (await import("./lib/wicket")).default()).Wkt() as __utils.Wkt
-
+        this.ProjectParameters = await loadModule<__esri.ProjectParametersConstructor>("esri/tasks/support/ProjectParameters")
+        
+        this.wicket = await new Wicket().load()
+        
+        return this
     }
 
     async toWkt(
@@ -95,25 +97,24 @@ export class GeometryTransaction {
         destWKID: __esri.SpatialReferenceProperties = { wkid: 3826 }
     ): Promise<string> {
 
-        await this.load()
-
         const destSpatialReference = new this.SpatialReference(destWKID)
 
         // ? : check the intent
-        geometries = geometries.map(geometry => {
-            if (geometry.type === "point") {
-                return new this.Point({ ...geometry, spatialReference: destSpatialReference })
-            } else {
-                console.error("[convertToWkt input error]", geometry)
-            }
-            return geometry
-        })
+        // geometries = geometries.map(geometry => {
+        //     if (geometry.type === "point") {
+
+        //         return new this.Point({ ...geometry, spatialReference: destSpatialReference })
+        //     } else {
+        //         console.error("[convertToWkt input error]", geometry)
+        //     }
+        //     return geometry
+        // })
 
         // project by client
         const projed = this.clientProjection.project(geometries, destSpatialReference)[0]
-
-        this.Wicket.fromObject(projed)
-        const wktStr = this.Wicket.write()
+        
+        this.wicket.fromObject(projed)
+        const wktStr = this.wicket.write()
 
         console.log("[convertToWkt result]", wktStr)
 
@@ -126,10 +127,8 @@ export class GeometryTransaction {
         destWKID: __esri.SpatialReferenceProperties = { wkid: 102443 }
     ): Promise<__esri.Geometry> {
 
-        await this.load()
-
-        this.Wicket.read(wkt)
-        const geometries = this.Wicket.toObject({ spatialReference: srcWKID })
+        this.wicket.read(wkt)
+        const geometries = this.wicket.toObject({ spatialReference: srcWKID })
 
         // todo web assembly : client proj
 
@@ -138,7 +137,7 @@ export class GeometryTransaction {
             geometries,
             outSpatialReference: new this.SpatialReference(destWKID),
         })
-        const res = (await this.Gsrv.project(projectParameters))[0]
+        const res = (await this.gsrv.project(projectParameters))[0]
 
         console.log("[ convertArcgis ]", res)
         return res

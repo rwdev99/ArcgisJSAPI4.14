@@ -1,4 +1,5 @@
 import { loadModule, GeometryTransaction } from './utils'
+import { LayerFactory } from './layer'
 
 export class BaseDraw {
   
@@ -6,9 +7,10 @@ export class BaseDraw {
   Engine:__esri.geometryEngineAsync
   Circle:__esri.CircleConstructor
 
-  GeometryTransaction:GeometryTransaction
+  geometryTransaction:GeometryTransaction
 
   view:__esri.MapView
+  map:__esri.Map
   glyr:__esri.GraphicsLayer
 
   pointSymbol:__esri.PictureMarkerSymbolProperties = {
@@ -26,7 +28,6 @@ export class BaseDraw {
         color: "red",
         width: 2
     }
-    // type: "simple-fill",
     // color: [ 0,0, 255, 0.2 ],
     // outline: {
     //     style:"dash-dot",
@@ -35,33 +36,49 @@ export class BaseDraw {
     // }
   }
 
+  polylineSymbol :__esri.SimpleLineSymbolProperties={
+    type: "simple-line", 
+    color: [4, 90, 141],
+    width: 1,
+    cap: "round",
+    join: "round" 
+    // miter
+}
+
   async load(){
     this.Graphic = await loadModule<__esri.GraphicConstructor>("esri/Graphic")
     this.Engine = await loadModule<__esri.geometryEngineAsync>("esri/geometry/geometryEngineAsync")
     this.Circle = await loadModule<__esri.CircleConstructor>("esri/geometry/Circle")
-    this.GeometryTransaction = await new GeometryTransaction()
+    this.geometryTransaction = await new GeometryTransaction().load()
+
+    // auto create graphicslayer
+    const layerFactory = new LayerFactory(this.map)
+    this.glyr = await layerFactory.addRawLayer("graphiclayer",{
+      ID:`Auto-Created-BaseDraw-${Date.now()}`,
+      Datatype:"graphicslayer",
+      LayerName:`Auto-Created-BaseDraw`,
+    })
+
+    return this
   }
 
-  constructor(view:__esri.MapView, glyr:__esri.GraphicsLayer){
+  constructor(view:__esri.MapView, map:__esri.Map){
     this.view = view
-    this.glyr = glyr
+    this.map = map
   }
 
   /** convert graphics in "this.glyr" to wkt */
   async getWkt():Promise<string>{
-    await this.load()
-
     /** "Esri/Collection" to Array @see https://developers.arcgis.com/javascript/latest/api-reference/esri-core-Collection.html#toArray */
     const geometries = this.glyr.graphics.toArray().map(({geometry})=>geometry).filter(g=>g)
     const geometriesUnioned = await this.Engine.union(geometries)
-    return await this.GeometryTransaction.toWkt([geometriesUnioned])
+    return await this.geometryTransaction.toWkt([geometriesUnioned])
   }
 
   async addGraphic(wkt:string,symbolOpts:any):Promise<__esri.GraphicsLayer>{
-    await this.load()
-    
+   
     // todo wkt's spatialReference move to config , dest is always this.view.spatialReference
-    const geometry = await this.GeometryTransaction.toArcgis(
+    const geometry = await this.geometryTransaction.toArcgis(
       wkt,
       {wkid:102443},
       this.view.spatialReference
@@ -111,4 +128,9 @@ export class BaseDraw {
 
   }
 
+  destroy(){
+    this.clearGraphics()
+    this.map.remove(this.glyr)
+    console.log("[BaseDraw destroyed]")
+  }
 }
