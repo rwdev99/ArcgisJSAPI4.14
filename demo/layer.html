@@ -23,13 +23,14 @@
         <input id="wfImg" type="file" accept=".tif,.jpg,.png,.bmp"/>
         <label for="wfArgs"> world file </label>
         <input id="wfArgs" type="file" accept=".gfw,.jgw,.j2w,.pgw,.tfw,.wld"/>
-        <select name="來源空間參考" id="srs">
+        <label for="srs"> source srs </label>
+        <select name="source srs" id="srs">
             <option value="EPSG:3828"> TWD67 </option>
             <option value="EPSG:3826"> TWD97 </option>
             <option value="EPSG:4326"> WGS84 </option>
             <option value="EPSG:3857"> Web Mercator/WGS84 </option>
         </select>
-        <button id="projBtn"> Proj </button>
+        <button id="projBtn"> Proj File onto Map </button>
     </div>
 </body>
 

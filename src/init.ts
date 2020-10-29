@@ -1,4 +1,4 @@
-import { loadModule } from './utils'
+import { loadModule,CONFIG } from './utils'
 
 export class Init {
 
@@ -58,22 +58,22 @@ export class Init {
     }
 
     // todo
-    // async create3D(
-    //     mapConfig: __esri.WebSceneProperties,
-    //     viewConfig:__esri.SceneViewProperties
-    // ):Promise<Init>{
+    async create3D(
+        mapConfig: __esri.WebSceneProperties,
+        viewConfig:__esri.SceneViewProperties
+    ):Promise<Init>{
 
-    //     const WEBSCENE_URL = mapConfig && ('portalItem' in mapConfig) ? "WebScene" : "Map"
-    //     const Map = await loadModule< __esri.MapConstructor>(`esri/${WEBSCENE_URL}`)
-    //     const View = await loadModule<__esri.SceneViewConstructor>(`esri/views/SceneView`)
+        const WEBSCENE_URL = mapConfig && ('portalItem' in mapConfig) ? "WebScene" : "Map"
+        const Map = await loadModule< __esri.MapConstructor>(`esri/${WEBSCENE_URL}`)
+        const View = await loadModule<__esri.SceneViewConstructor>(`esri/views/SceneView`)
 
-    //     this.map = new Map(mapConfig)
-    //     this.view = new View ({...viewConfig,map:this.map})
+        this.map = new Map(mapConfig)
+        this.view = new View ({...viewConfig,map:this.map})
 
-    //     this.view.ui.components= []
+        this.view.ui.components= []
         
-    //     return this
-    // }
+        return this
+    }
 
     /**
      * 設置 ARCGIS 預設工具 到 ARCGIS UI 指定的位置
@@ -90,10 +90,7 @@ export class Init {
                 this.view.ui.empty("bottom-left")
                 this.view.ui.empty("top-left")
                 this.view.ui.empty("top-right")
-            }else{
-                throw new TypeError("Illegal components:"+components.join('、')+"or Illegal position:"+position)
             }
-            await this.view.when()
         }catch(e){
             console.error(e)
         }
@@ -106,13 +103,10 @@ export class Init {
      */
     setMapViewConstraintsScale(
         view:__esri.MapView,
-        scale:{
-            maxScale?:number,
-            minScale?:number
-        }
+        {maxScale,minScale}:{maxScale?:number,minScale?:number}
     ):__esri.MapView{
-        if(scale&&scale.maxScale) view.constraints.maxScale = scale.maxScale 
-        if(scale&&scale.minScale) view.constraints.minScale = scale.minScale 
+        if(maxScale) view.constraints.maxScale = maxScale 
+        if(minScale) view.constraints.minScale = minScale 
         return view
     }
 
@@ -121,128 +115,10 @@ export class Init {
      * @see https://developers.arcgis.com/javascript/latest/api-reference/esri-views-MapView.html#constraints
      */
     async setMapViewConstraintsLods(view:__esri.MapView,lods?:Array<__init.lodProperties>):Promise<__esri.MapView>{
-        lods = lods || [
-            {
-                "level": 1,
-                "scale": 295828763.795777,
-                "resolution": 78271.5169639999
-            },
-            {
-                "level": 2,
-                "scale": 147914381.897889,
-                "resolution": 39135.7584820001
-            },
-            {
-                "level": 3,
-                "scale": 73957190.948944,
-                "resolution": 19567.8792409999
-            },
-            {
-                "level": 4,
-                "scale": 36978595.474472,
-                "resolution": 9783.93962049996
-            },
-            {
-                "level": 5,
-                "scale": 18489297.737236,
-                "resolution": 4891.96981024998
-            },
-            {
-                "level": 6,
-                "scale": 9244648.868618,
-                "resolution": 2445.98490512499
-            },
-            {
-                "level": 7,
-                "scale": 4622324.434309,
-                "resolution": 1222.99245256249
-            },
-            {
-                "level": 8,
-                "scale": 2311162.217155,
-                "resolution": 611.49622628138
-            },
-            {
-                "level": 9,
-                "scale": 1155581.108577,
-                "resolution": 305.748113140558
-            },
-            {
-                "level": 10,
-                "scale": 577790.554289,
-                "resolution": 152.874056570411
-            },
-            {
-                "level": 11,
-                "scale": 288895.277144,
-                "resolution": 76.4370282850732
-            },
-            {
-                "level": 12,
-                "scale": 144447.638572,
-                "resolution": 38.2185141425366
-            },
-            {
-                "level": 13,
-                "scale": 72223.819286,
-                "resolution": 19.1092570712683
-            },
-            {
-                "level": 14,
-                "scale": 36111.909643,
-                "resolution": 9.55462853563415
-            },
-            {
-                "level": 15,
-                "scale": 18055.954822,
-                "resolution": 4.77731426794937
-            },
-            {
-                "level": 16,
-                "scale": 9027.977411,
-                "resolution": 2.38865713397468
-            },
-            {
-                "level": 17,
-                "scale": 4513.988705,
-                "resolution": 1.19432856685505
-            },
-            {
-                "level": 18,
-                "scale": 2256.994353,
-                "resolution": 0.597164283559817
-            },
-            {
-                "level": 19,
-                "scale": 1128.4994333441377,
-                "resolution": 0.298582141647617
-            },
-            {
-                "level": 20,
-                "scale": 564.2497166720685,
-                "resolution": 0.1492910708238085
-            },
-            {
-                "level": 21,
-                "scale": 282.124294,
-                "resolution": 0.07464553541190416
-            },
-            {
-                "level": 22,
-                "scale": 141.062147,
-                "resolution": 0.03732276770595208
-            },
-            {   "level": 23, 
-                "scale": 70.5310735, 
-                "resolution": 0.01866138385297604 
-            }
-        ]
-
+        lods = lods || CONFIG.LODS
         const Lod =  await loadModule<__esri.LODConstructor>(`esri/layers/support/LOD`)
         view.constraints.lods = lods.map(lod=>new Lod(lod))
-
         return view
-
     }
 
     /** 限制 mpaView 範圍 : extext (平移若超出預設 Extent 則自動回到預設) */
@@ -269,20 +145,15 @@ export class Init {
     async getGeoLocation():Promise<[number,number]> {
         try {
             if (!navigator.geolocation) throw("不支援地理位置定位")
-            try{
-                const pos = await (new Promise((res, rej)=>{
-                    navigator.geolocation.getCurrentPosition(success=>res(success), error=>rej(error))
-                })) as any
-                const latitude  = pos.coords.latitude;
-                const longitude = pos.coords.longitude;
-                return [latitude,longitude]
-            }catch(e){
-                throw (e)
-            }
+            const {coords:{latitude,longitude}} = await (new Promise((res, rej)=>{
+                navigator.geolocation.getCurrentPosition(success=>res(success), error=>rej(error))
+            })) as Position
+            return [latitude,longitude]
         }catch(e){
-            console.error("geo location errro",e)
+            console.error("[ getGeoLocation fail ]",e)
             throw(e)
         }
     }
+
 
 }

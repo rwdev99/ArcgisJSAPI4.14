@@ -53,6 +53,15 @@
         const wrapper = document.createElement('div')
         wrapper.style.cssText = `position:absolute;top:0;left:0;z-index:9999;`
         document.body.append(wrapper)
+        
+        const destroy = document.createElement('button')
+        destroy.innerText = "destroy"
+        destroy.onclick = ()=>destroyAll()
+
+        const buffer = document.createElement('input')
+        buffer.placeholder = "buffer"
+        buffer.type = "number"
+
 
         for (const k of Object.keys(drawTools)) {
             
@@ -67,31 +76,44 @@
             const search = document.createElement('button')
             search.innerText = "search"
             
-            const destroy = document.createElement('button')
-            destroy.innerText = "destroy"
-
-            const buffer = document.createElement('input')
-            buffer.placeholder = "buffer"
-            buffer.type = "number"
-            
             wrapper.append(measure)
             wrapper.append(search)
-            wrapper.append(destroy)
             
-            buffer.onchange = e => drawTools[k].setBuffer(e.target.value)
             measure.onclick = async ()=>{
-                // if(wrapper.contains(buffer)) wrapper.removeChild(buffer)
-                drawTools[k].destroy()
+                destroyAll()
+                if(commonWrapper.contains(buffer)){
+                    commonWrapper.removeChild(buffer)
+                    buffer.onchange = null
+                } 
                 await drawTools[k].measure(view,map)
             }
             search.onclick = async ()=>{
-                // if(!wrapper.contains(buffer)) wrapper.append(buffer)
-                drawTools[k].destroy()
+                destroyAll()
+                if(!commonWrapper.contains(buffer)){
+                    buffer.value = 0
+                    commonWrapper.append(buffer)
+                    buffer.onchange = e=> {
+                        console.log(drawTools[k])
+                        drawTools[k].setBuffer(e.target.value)
+                    }
+                }
                 await drawTools[k].search(view,map)
             }
-            destroy.onclick = ()=>drawTools[k].destroy()
-
         }
+
+        
+        const commonWrapper = document.createElement('p')
+        commonWrapper.appendChild(destroy)
+        wrapper.appendChild(commonWrapper)
+
+        const destroyAll = ()=>{
+            if(commonWrapper.contains(buffer)){
+                commonWrapper.removeChild(buffer)
+                buffer.onchange = null
+            } 
+            Object.values(drawTools).forEach(t =>t.destroy())
+        }
+        
     })();
 </script>
 
