@@ -1,6 +1,5 @@
-import { proj,loadModule,TipText,EventHub }from './utils'
+import { proj84to97,loadModule,TipText,EventHub }from './utils'
 import { BaseDraw } from './draw'
-import { proj84to97 } from './lib/proj4'
 
 export class DrawPoint extends BaseDraw{
     
@@ -37,12 +36,21 @@ export class DrawPoint extends BaseDraw{
         }))
     }
     
-    private async _addBufferedGraphic(geometry:__esri.geometry.Geometry,timestamp:number){
+    private async _addAndBuffGraphicToGlyr(geometry:__esri.geometry.Geometry,timestamp:number){
         if(!this.buffer) return
+        let symbol = {
+            type: "simple-fill",
+            color: [ 255,0, 0, 0.2 ],
+            outline: {
+                style:"dash-dot",
+                color: [255, 0, 0, 0.8],
+                width: 1
+            }
+        }
         this.glyr.add(new this.Graphic({
-            geometry: await this.buffGeometry(geometry,this.buffer) as __esri.Circle,
+            geometry: await this.buffGeometry(geometry,this.buffer),
             attributes:{timestamp},
-            symbol: this.polygonSymbol
+            symbol
         }))
     }
     
@@ -70,15 +78,17 @@ export class DrawPoint extends BaseDraw{
             const [x,y] = evt.coordinates
             const point = new this.Point({x,y,spatialReference:this.view.spatialReference})
 
-            await this._addBufferedGraphic(point,timestamp)
+            await this._addAndBuffGraphicToGlyr(point,timestamp)
         })
 
-        this.drawAction.on("draw-complete",(evt:__esri.PointDrawActionDrawCompleteEvent&{native:MouseEvent})=>{
+        this.drawAction.on("draw-complete",async (evt:__esri.PointDrawActionDrawCompleteEvent&{native:MouseEvent})=>{
 
             this.clearGraphicsByTime(timestamp)
             const [x,y] = evt.coordinates
             const point = new this.Point({x,y,spatialReference:this.view.spatialReference})
-            this._addGraphicToGlyr(point,timestamp)
+
+            await this._addAndBuffGraphicToGlyr(point,timestamp)
+            await this._addGraphicToGlyr(point,timestamp)
 
             this.tipText.setText('')
             
@@ -121,7 +131,7 @@ export class DrawPoint extends BaseDraw{
             if(evt.state==="cancel" || evt.state==="complete"){
                 this.eventHub.emit("tipText","處理中...")
             }
-            this.eventHub.emit("complete",this.glyr)
+            this.eventHub.emit("complete")
         })
     }
 
@@ -142,15 +152,15 @@ export const measure  = async (view:__esri.MapView,map:__esri.Map)=>{
     drawPoint = await new DrawPoint(view,map).load()
     // when finished ; emit "complete" event to "drawPoint.eventHub" and must register event first
     drawPoint.eventHub.on('complete',async ()=>{
-        console.log("[ draw complete do measure]")
         drawPoint.draw()
-
+        
+        console.log("[ draw complete do measure]",drawPoint.glyr.graphics.toArray())
         const {latitude,longitude,x,y} = drawPoint.glyr.graphics.getItemAt(0).geometry  as __esri.Point       
         const [X97,Y97] = proj84to97([x,y])
 
         const res = {latitude,longitude,X97,Y97}
 
-        console.log(res)
+        console.log("[drawPolygon measure]",res)
     })
 
     await drawPoint.draw()
@@ -173,3 +183,4 @@ export const destroy = ()=>{
     if(drawPoint) drawPoint.destroy()
     drawPoint = null
 }
+export const setBuffer = (buffer:number) => drawPoint.buffer = Number(buffer) || 0

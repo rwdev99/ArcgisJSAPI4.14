@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>draw</title>
+    
+    <style>
+        html,body,#viewDiv {
+            padding: 0;
+            margin: 0;
+            height: 100%;
+            width: 100%;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="viewDiv"></div>
+</body>
+
+<script src="./init.js"></script>
+<script src="./drawPolyline.js"></script>
+<script src="./drawPolygon.js"></script>
+<script src="./drawPoint.js"></script>
+
+<script>
+    (async ()=>{
+        
+        // create map
+        const InitIns = new init.Init()
+        const {view,map} = await InitIns.create2D({
+            basemap:'topo'
+        },{
+            container:"viewDiv",
+            extent:{
+                xmax: "13475726.80897781",
+                xmin: "13456254.47602219",
+                ymax: "2858002.702937889",
+                ymin: "2840097.3290621107",
+                spatialReference:{
+                    wkid: 3857
+                },
+            },
+            spatialReference:{
+                wkid: 3857
+            }
+        });
+
+        // iterate drawtools
+        const drawTools = {drawPolyline,drawPolygon,drawPoint}
+
+        const wrapper = document.createElement('div')
+        wrapper.style.cssText = `position:absolute;top:0;left:0;z-index:9999;`
+        document.body.append(wrapper)
+
+        for (const k of Object.keys(drawTools)) {
+            
+            console.log(k, drawTools[k])
+            const h3 = document.createElement("h3")
+            h3.innerText = k
+            wrapper.append(h3)
+            
+            const measure = document.createElement('button')
+            measure.innerText = "measure"
+            
+            const search = document.createElement('button')
+            search.innerText = "search"
+            
+            const destroy = document.createElement('button')
+            destroy.innerText = "destroy"
+
+            const buffer = document.createElement('input')
+            buffer.placeholder = "buffer"
+            buffer.type = "number"
+            
+            wrapper.append(measure)
+            wrapper.append(search)
+            wrapper.append(destroy)
+            
+            buffer.onchange = e => drawTools[k].setBuffer(e.target.value)
+            measure.onclick = async ()=>{
+                // if(wrapper.contains(buffer)) wrapper.removeChild(buffer)
+                drawTools[k].destroy()
+                await drawTools[k].measure(view,map)
+            }
+            search.onclick = async ()=>{
+                // if(!wrapper.contains(buffer)) wrapper.append(buffer)
+                drawTools[k].destroy()
+                await drawTools[k].search(view,map)
+            }
+            destroy.onclick = ()=>drawTools[k].destroy()
+
+        }
+    })();
+</script>
+
+</html>

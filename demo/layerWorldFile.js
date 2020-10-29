@@ -1,4 +1,4 @@
-var init = (function (exports) {
+var layerWorldFile = (function (exports) {
     'use strict';
 
     /* Copyright (c) 2017 Environmental Systems Research Institute, Inc.
@@ -8080,6 +8080,20 @@ var init = (function (exports) {
         "EPSG:3825": "+title=�G�פ��a�GTWD97 TM2 ��� +proj=tmerc +lat_0=0 +lon_0=119 +k=0.9999 +x_0=250000 +y_0=0 +ellps=GRS80 +units=���� +no_defs",
     };
     proj4.defs(Object.keys(defs$1).map(function (k) { return ([k, defs$1[k]]); }));
+    var proj = function (fromEPSG, toEPSG, coords) {
+        var WKID = {
+            102441: "EPSG:3828",
+            // 102442:"EPSG:3827",
+            102443: "EPSG:3826",
+            102444: "EPSG:3825",
+            3857: "EPSG:900913",
+            102100: "EPSG:900913",
+            4326: "EPSG:4326"
+        };
+        fromEPSG = WKID[fromEPSG] || fromEPSG;
+        toEPSG = WKID[toEPSG] || toEPSG;
+        return proj4(fromEPSG, toEPSG).forward(coords);
+    };
 
     var __awaiter$1 = (undefined && undefined.__awaiter) || function (thisArg, _arguments, P, generator) {
         function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
@@ -8128,17 +8142,6 @@ var init = (function (exports) {
         VERSION: "4.14"
     };
 
-    var __assign = (undefined && undefined.__assign) || function () {
-        __assign = Object.assign || function(t) {
-            for (var s, i = 1, n = arguments.length; i < n; i++) {
-                s = arguments[i];
-                for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p))
-                    t[p] = s[p];
-            }
-            return t;
-        };
-        return __assign.apply(this, arguments);
-    };
     var __awaiter$2 = (undefined && undefined.__awaiter) || function (thisArg, _arguments, P, generator) {
         function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
         return new (P || (P = Promise))(function (resolve, reject) {
@@ -8175,347 +8178,120 @@ var init = (function (exports) {
             if (op[0] & 5) throw op[1]; return { value: op[0] ? op[1] : void 0, done: true };
         }
     };
-    var Init = /** @class */ (function () {
-        function Init() {
+    var LayerWorldFile = /** @class */ (function () {
+        function LayerWorldFile(view) {
+            this.view = view;
         }
-        /**@see https://developers.arcgis.com/javascript/latest/api-reference/esri-config.html */
-        Init.prototype.setEsriConfig = function (config) {
+        LayerWorldFile.prototype.toExtent = function (_a) {
+            var pixelSizeX = _a.pixelSizeX, pixelSizeY = _a.pixelSizeY, rotationX = _a.rotationX, rotaionY = _a.rotaionY, centerCoordX = _a.centerCoordX, centerCoordY = _a.centerCoordY, imagewidth = _a.imagewidth, imageHeight = _a.imageHeight;
+            var xmin = centerCoordX - (pixelSizeX / 2);
+            var ymax = centerCoordY - (pixelSizeY / 2);
+            var xmax = xmin + (pixelSizeX * imagewidth);
+            var ymin = ymax + (pixelSizeY * imageHeight);
+            return { xmin: xmin, ymax: ymax, xmax: xmax, ymin: ymin };
+        };
+        LayerWorldFile.prototype.read = function (img, wf) {
             return __awaiter$2(this, void 0, void 0, function () {
-                var _a;
+                var fileReader, wDef, image, imagewidth, imageHeight, _a, w, h, wfArgs, pixelSizeX, rotationX, rotaionY, pixelSizeY, centerCoordX, centerCoordY;
                 return __generator$2(this, function (_b) {
                     switch (_b.label) {
                         case 0:
-                            _a = this;
-                            return [4 /*yield*/, loadModule("esri/config")];
+                            console.log("img", img);
+                            console.log("wf", wf);
+                            fileReader = new FileReader();
+                            return [4 /*yield*/, new Promise(function (res, rej) {
+                                    fileReader.readAsText(wf);
+                                    fileReader.onload = function () { return res(fileReader.result); };
+                                    fileReader.onerror = function (e) { return rej("[ world args read error ]" + e); };
+                                })];
                         case 1:
-                            _a.esriConfig = _b.sent();
-                            return [2 /*return*/];
+                            wDef = _b.sent();
+                            // get img size
+                            this.imgSrc = URL.createObjectURL(img);
+                            image = new Image();
+                            image.src = this.imgSrc;
+                            imagewidth = 0;
+                            imageHeight = 0;
+                            return [4 /*yield*/, new Promise(function (res, rej) {
+                                    image.onload = function () { return res({ w: image.width, h: image.height }); };
+                                    image.onerror = function (e) { return rej('[ img read error ]' + e); };
+                                })];
+                        case 2:
+                            _a = _b.sent(), w = _a.w, h = _a.h;
+                            imagewidth = w;
+                            imageHeight = h;
+                            console.log({ imagewidth: imagewidth, imageHeight: imageHeight });
+                            wfArgs = wDef.split(/\r|\n/).map(function (s) { return s.trim(); }).filter(function (s) { return s !== ''; });
+                            console.log("[ parse world file args ]", wfArgs);
+                            pixelSizeX = wfArgs[0], rotationX = wfArgs[1], rotaionY = wfArgs[2], pixelSizeY = wfArgs[3], centerCoordX = wfArgs[4], centerCoordY = wfArgs[5];
+                            this.extent = this.toExtent({ pixelSizeX: pixelSizeX, pixelSizeY: pixelSizeY, rotationX: rotationX, rotaionY: rotaionY, centerCoordX: centerCoordX, centerCoordY: centerCoordY, imagewidth: imagewidth, imageHeight: imageHeight });
+                            return [2 /*return*/, this.extent];
                     }
                 });
             });
         };
-        Init.prototype.setEsriConfigRequestInterceptors = function (tables) {
+        LayerWorldFile.prototype.getLyrConstrutor = function (srcEPSG) {
             return __awaiter$2(this, void 0, void 0, function () {
+                var BaseDynamicLayer, customlyr;
                 var _this = this;
                 return __generator$2(this, function (_a) {
-                    tables.forEach(function (_a) {
-                        var srcUrl = _a.srcUrl, destUrl = _a.destUrl, proxyer = _a.proxyer;
-                        var RequestInterceptor = {
-                            before: function (_a) {
-                                var url = _a.url;
-                                if (url !== srcUrl)
-                                    return;
-                                url = destUrl ? destUrl : proxyer + "?" + url;
-                            },
-                            error: function () { return console.error("srcUrl " + srcUrl + ",destUrl " + destUrl + ",proxyer " + proxyer); }
-                        };
-                        _this.esriConfig.request.interceptors.push(RequestInterceptor);
-                    });
-                    return [2 /*return*/];
-                });
-            });
-        };
-        Init.prototype.create2D = function (mapConfig, viewConfig) {
-            return __awaiter$2(this, void 0, void 0, function () {
-                var MAP_URL, Map, View, Home;
-                return __generator$2(this, function (_a) {
                     switch (_a.label) {
                         case 0:
-                            MAP_URL = mapConfig && mapConfig.hasOwnProperty('portalItem') ? "WebMap" : "Map";
-                            return [4 /*yield*/, loadModule("esri/" + MAP_URL)];
+                            console.log("srcEPSG", srcEPSG);
+                            return [4 /*yield*/, loadModule("esri/layers/BaseDynamicLayer")];
                         case 1:
-                            Map = (_a.sent());
-                            return [4 /*yield*/, loadModule("esri/views/MapView")];
-                        case 2:
-                            View = (_a.sent());
-                            this.defaultExtent = viewConfig.extent;
-                            this.map = new Map(mapConfig);
-                            this.view = new View(__assign(__assign({}, viewConfig), { map: this.map }));
-                            return [4 /*yield*/, this.setMapViewConstraintsLods(this.view)];
-                        case 3:
-                            _a.sent();
-                            this.view.ui.components = [];
-                            return [4 /*yield*/, loadModule("esri/widgets/Home")];
-                        case 4:
-                            Home = _a.sent();
-                            this.backDefaultExtentWidget = new Home({
-                                view: this.view
-                            });
-                            return [2 /*return*/, this];
-                    }
-                });
-            });
-        };
-        // todo
-        // async create3D(
-        //     mapConfig: __esri.WebSceneProperties,
-        //     viewConfig:__esri.SceneViewProperties
-        // ):Promise<Init>{
-        //     const WEBSCENE_URL = mapConfig && ('portalItem' in mapConfig) ? "WebScene" : "Map"
-        //     const Map = await loadModule< __esri.MapConstructor>(`esri/${WEBSCENE_URL}`)
-        //     const View = await loadModule<__esri.SceneViewConstructor>(`esri/views/SceneView`)
-        //     this.map = new Map(mapConfig)
-        //     this.view = new View ({...viewConfig,map:this.map})
-        //     this.view.ui.components= []
-        //     return this
-        // }
-        /**
-         * 設置 ARCGIS 預設工具 到 ARCGIS UI 指定的位置
-         * @see https://developers.arcgis.com/javascript/latest/api-reference/esri-views-ui-DefaultUI.html
-         */
-        Init.prototype.setMapUI = function (components, position) {
-            return __awaiter$2(this, void 0, void 0, function () {
-                var e_1;
-                return __generator$2(this, function (_a) {
-                    switch (_a.label) {
-                        case 0:
-                            _a.trys.push([0, 5, , 6]);
-                            if (!/bottom-right|bottom-left|top-left|top-right'/ig.test(position)) return [3 /*break*/, 2];
-                            this.view.ui.components = components;
-                            return [4 /*yield*/, this.view.when()];
-                        case 1:
-                            _a.sent();
-                            this.view.ui.move(['compass', 'zoom'], position);
-                            return [3 /*break*/, 3];
-                        case 2:
-                            if (Array.isArray(components) && components.length === 0) { //- assume to empty all
-                                this.view.ui.empty("bottom-right");
-                                this.view.ui.empty("bottom-left");
-                                this.view.ui.empty("top-left");
-                                this.view.ui.empty("top-right");
-                            }
-                            else {
-                                throw new TypeError("Illegal components:" + components.join('、') + "or Illegal position:" + position);
-                            }
-                            _a.label = 3;
-                        case 3: return [4 /*yield*/, this.view.when()];
-                        case 4:
-                            _a.sent();
-                            return [3 /*break*/, 6];
-                        case 5:
-                            e_1 = _a.sent();
-                            console.error(e_1);
-                            return [3 /*break*/, 6];
-                        case 6: return [2 /*return*/];
-                    }
-                });
-            });
-        };
-        /**
-         * 限制 mpaView 範圍 : scale
-         * @returns {mapView}
-         * @see https://developers.arcgis.com/javascript/latest/api-reference/esri-views-MapView.html#constraints
-         */
-        Init.prototype.setMapViewConstraintsScale = function (view, scale) {
-            if (scale && scale.maxScale)
-                view.constraints.maxScale = scale.maxScale;
-            if (scale && scale.minScale)
-                view.constraints.minScale = scale.minScale;
-            return view;
-        };
-        /**
-         * 限制 mpaView 範圍 : lods (必要，否則空白底圖會使scale顯示不正常)
-         * @see https://developers.arcgis.com/javascript/latest/api-reference/esri-views-MapView.html#constraints
-         */
-        Init.prototype.setMapViewConstraintsLods = function (view, lods) {
-            return __awaiter$2(this, void 0, void 0, function () {
-                var Lod;
-                return __generator$2(this, function (_a) {
-                    switch (_a.label) {
-                        case 0:
-                            lods = lods || [
-                                {
-                                    "level": 1,
-                                    "scale": 295828763.795777,
-                                    "resolution": 78271.5169639999
+                            BaseDynamicLayer = _a.sent();
+                            customlyr = BaseDynamicLayer.createSubclass({
+                                properties: {
+                                    getMapUrl: null,
+                                    getMapParameters: null
                                 },
-                                {
-                                    "level": 2,
-                                    "scale": 147914381.897889,
-                                    "resolution": 39135.7584820001
-                                },
-                                {
-                                    "level": 3,
-                                    "scale": 73957190.948944,
-                                    "resolution": 19567.8792409999
-                                },
-                                {
-                                    "level": 4,
-                                    "scale": 36978595.474472,
-                                    "resolution": 9783.93962049996
-                                },
-                                {
-                                    "level": 5,
-                                    "scale": 18489297.737236,
-                                    "resolution": 4891.96981024998
-                                },
-                                {
-                                    "level": 6,
-                                    "scale": 9244648.868618,
-                                    "resolution": 2445.98490512499
-                                },
-                                {
-                                    "level": 7,
-                                    "scale": 4622324.434309,
-                                    "resolution": 1222.99245256249
-                                },
-                                {
-                                    "level": 8,
-                                    "scale": 2311162.217155,
-                                    "resolution": 611.49622628138
-                                },
-                                {
-                                    "level": 9,
-                                    "scale": 1155581.108577,
-                                    "resolution": 305.748113140558
-                                },
-                                {
-                                    "level": 10,
-                                    "scale": 577790.554289,
-                                    "resolution": 152.874056570411
-                                },
-                                {
-                                    "level": 11,
-                                    "scale": 288895.277144,
-                                    "resolution": 76.4370282850732
-                                },
-                                {
-                                    "level": 12,
-                                    "scale": 144447.638572,
-                                    "resolution": 38.2185141425366
-                                },
-                                {
-                                    "level": 13,
-                                    "scale": 72223.819286,
-                                    "resolution": 19.1092570712683
-                                },
-                                {
-                                    "level": 14,
-                                    "scale": 36111.909643,
-                                    "resolution": 9.55462853563415
-                                },
-                                {
-                                    "level": 15,
-                                    "scale": 18055.954822,
-                                    "resolution": 4.77731426794937
-                                },
-                                {
-                                    "level": 16,
-                                    "scale": 9027.977411,
-                                    "resolution": 2.38865713397468
-                                },
-                                {
-                                    "level": 17,
-                                    "scale": 4513.988705,
-                                    "resolution": 1.19432856685505
-                                },
-                                {
-                                    "level": 18,
-                                    "scale": 2256.994353,
-                                    "resolution": 0.597164283559817
-                                },
-                                {
-                                    "level": 19,
-                                    "scale": 1128.4994333441377,
-                                    "resolution": 0.298582141647617
-                                },
-                                {
-                                    "level": 20,
-                                    "scale": 564.2497166720685,
-                                    "resolution": 0.1492910708238085
-                                },
-                                {
-                                    "level": 21,
-                                    "scale": 282.124294,
-                                    "resolution": 0.07464553541190416
-                                },
-                                {
-                                    "level": 22,
-                                    "scale": 141.062147,
-                                    "resolution": 0.03732276770595208
-                                },
-                                { "level": 23,
-                                    "scale": 70.5310735,
-                                    "resolution": 0.01866138385297604
+                                getImageUrl: function () {
+                                    var img = new Image();
+                                    img.src = _this.imgSrc;
+                                    var canvas = document.createElement("canvas");
+                                    canvas.width = 1230;
+                                    canvas.height = 912;
+                                    var _a = _this.extent, xmax = _a.xmax, ymax = _a.ymax, xmin = _a.xmin, ymin = _a.ymin;
+                                    console.log("{xmax,ymax,xmin,ymin}", { xmax: xmax, ymax: ymax, xmin: xmin, ymin: ymin });
+                                    var rt84 = proj(srcEPSG, "EPSG:4326", [xmax, ymax]);
+                                    var rt = _this.view.toScreen({
+                                        x: rt84[0],
+                                        y: rt84[1],
+                                        spatialReference: {
+                                            wkid: 4326
+                                        }
+                                    });
+                                    console.log("rt", rt);
+                                    var rb84 = proj(srcEPSG, "EPSG:4326", [xmax, ymin]);
+                                    var rb = _this.view.toScreen({
+                                        x: rb84[0],
+                                        y: rb84[1],
+                                        spatialReference: {
+                                            wkid: 4326
+                                        }
+                                    });
+                                    var lt84 = proj(srcEPSG, "EPSG:4326", [xmin, ymax]);
+                                    var lt = _this.view.toScreen({
+                                        x: lt84[0],
+                                        y: lt84[1],
+                                        spatialReference: {
+                                            wkid: 4326
+                                        }
+                                    });
+                                    canvas.getContext("2d").drawImage(img, lt.x, lt.y, Math.abs(rt.x - lt.x), Math.abs(lt.y - rb.y));
+                                    return canvas.toDataURL("image/png");
                                 }
-                            ];
-                            return [4 /*yield*/, loadModule("esri/layers/support/LOD")];
-                        case 1:
-                            Lod = _a.sent();
-                            view.constraints.lods = lods.map(function (lod) { return new Lod(lod); });
-                            return [2 /*return*/, view];
+                            });
+                            return [2 /*return*/, customlyr];
                     }
                 });
             });
         };
-        /** 限制 mpaView 範圍 : extext (平移若超出預設 Extent 則自動回到預設) */
-        Init.prototype.setMapViewConstraintsExtent = function () {
-            var _this = this;
-            this.useExtentConstraint = true;
-            var outSide = false;
-            this.view.watch("extent", function (currentExtent) { return __awaiter$2(_this, void 0, void 0, function () {
-                var center;
-                return __generator$2(this, function (_a) {
-                    switch (_a.label) {
-                        case 0:
-                            if (!this.useExtentConstraint)
-                                return [2 /*return*/];
-                            center = currentExtent.center;
-                            if (outSide || !this.defaultExtent || !center)
-                                return [2 /*return*/];
-                            if (!(center.x < this.defaultExtent.xmin ||
-                                center.x > this.defaultExtent.xmax ||
-                                center.y < this.defaultExtent.ymin ||
-                                center.y > this.defaultExtent.ymax)) return [3 /*break*/, 2];
-                            outSide = true;
-                            return [4 /*yield*/, this.backDefaultExtentWidget.go()];
-                        case 1:
-                            _a.sent();
-                            outSide = false;
-                            _a.label = 2;
-                        case 2: return [2 /*return*/];
-                    }
-                });
-            }); });
-        };
-        /** @see https://developer.mozilla.org/zh-TW/docs/Web/API/Geolocation/Using_geolocation */
-        Init.prototype.getGeoLocation = function () {
-            return __awaiter$2(this, void 0, void 0, function () {
-                var pos, latitude, longitude, e_2, e_3;
-                return __generator$2(this, function (_a) {
-                    switch (_a.label) {
-                        case 0:
-                            _a.trys.push([0, 5, , 6]);
-                            if (!navigator.geolocation)
-                                throw ("不支援地理位置定位");
-                            _a.label = 1;
-                        case 1:
-                            _a.trys.push([1, 3, , 4]);
-                            return [4 /*yield*/, (new Promise(function (res, rej) {
-                                    navigator.geolocation.getCurrentPosition(function (success) { return res(success); }, function (error) { return rej(error); });
-                                }))];
-                        case 2:
-                            pos = _a.sent();
-                            latitude = pos.coords.latitude;
-                            longitude = pos.coords.longitude;
-                            return [2 /*return*/, [latitude, longitude]];
-                        case 3:
-                            e_2 = _a.sent();
-                            throw (e_2);
-                        case 4: return [3 /*break*/, 6];
-                        case 5:
-                            e_3 = _a.sent();
-                            console.error("geo location errro", e_3);
-                            throw (e_3);
-                        case 6: return [2 /*return*/];
-                    }
-                });
-            });
-        };
-        return Init;
+        return LayerWorldFile;
     }());
 
-    exports.Init = Init;
+    exports.LayerWorldFile = LayerWorldFile;
 
     Object.defineProperty(exports, '__esModule', { value: true });
 

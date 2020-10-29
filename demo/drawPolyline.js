@@ -1,4 +1,4 @@
-var init = (function (exports) {
+var drawPolyline = (function (exports) {
     'use strict';
 
     /* Copyright (c) 2017 Environmental Systems Research Institute, Inc.
@@ -8127,18 +8127,155 @@ var init = (function (exports) {
         GSVR_URL: "https://urbangis.hccg.gov.tw/arcgis/rest/services/Utilities/Geometry/GeometryServer",
         VERSION: "4.14"
     };
-
-    var __assign = (undefined && undefined.__assign) || function () {
-        __assign = Object.assign || function(t) {
-            for (var s, i = 1, n = arguments.length; i < n; i++) {
-                s = arguments[i];
-                for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p))
-                    t[p] = s[p];
-            }
-            return t;
+    var TipText = /** @class */ (function () {
+        function TipText(view, style) {
+            this.view = view;
+            this.dom = document.createElement("small");
+            this.view.container.appendChild(this.dom);
+            var defaultStyle = "\n            visibility:hidden;\n            position:fixed;\n            top:0px;\n            left:0px;\n            margin:1rem 0 0 1rem;\n            padding:0.5rem;\n            pointer-events:none;\n            background:rgba(0,0,0,0.5);\n            color:#fff;\n            border-radius:5px;\n        ";
+            this.dom.style.cssText = defaultStyle + style;
+        }
+        TipText.prototype.setPosition = function (x, y) {
+            this.dom.style.transform = "translate(" + x + "px," + y + "px)";
+            this.dom.style.visibility = "visible";
         };
-        return __assign.apply(this, arguments);
-    };
+        TipText.prototype.setText = function (text, type) {
+            this.dom.style.visibility = text === '' ? 'hidden' : 'visible';
+            this.dom.innerText = text;
+            this.dom.style.background = "rgba(0,0,0,0.5)";
+            this.dom.style.color = "#fff";
+            if (type === "warning") {
+                this.dom.style.color = "red";
+                this.dom.style.background = "rgba(256,256,256,0.8)";
+            }
+        };
+        TipText.prototype.destroy = function () {
+            if (this.view.container.contains(this.dom)) {
+                this.view.container.removeChild(this.dom);
+            }
+        };
+        return TipText;
+    }());
+    var GeometryTransaction = /** @class */ (function () {
+        function GeometryTransaction() {
+        }
+        GeometryTransaction.prototype.load = function () {
+            return __awaiter$1(this, void 0, void 0, function () {
+                var _a, _b, _c, Gsrv, _d, _e, _f;
+                return __generator$1(this, function (_g) {
+                    switch (_g.label) {
+                        case 0:
+                            _a = this;
+                            return [4 /*yield*/, loadModule("esri/geometry/Geometry")];
+                        case 1:
+                            _a.Geometry = _g.sent();
+                            _b = this;
+                            return [4 /*yield*/, loadModule("esri/geometry/Point")];
+                        case 2:
+                            _b.Point = _g.sent();
+                            _c = this;
+                            return [4 /*yield*/, loadModule("esri/geometry/SpatialReference")];
+                        case 3:
+                            _c.SpatialReference = _g.sent();
+                            return [4 /*yield*/, loadModule("esri/geometry/SpatialReference")];
+                        case 4:
+                            Gsrv = _g.sent();
+                            this.gsrv = new Gsrv({ url: CONFIG.GSVR_URL });
+                            _d = this;
+                            return [4 /*yield*/, loadModule("esri/geometry/projection")];
+                        case 5:
+                            _d.clientProjection = _g.sent();
+                            return [4 /*yield*/, this.clientProjection.load()];
+                        case 6:
+                            _g.sent();
+                            _e = this;
+                            return [4 /*yield*/, loadModule("esri/tasks/support/ProjectParameters")];
+                        case 7:
+                            _e.ProjectParameters = _g.sent();
+                            _f = this;
+                            return [4 /*yield*/, new Wicket().load()];
+                        case 8:
+                            _f.wicket = _g.sent();
+                            return [2 /*return*/, this];
+                    }
+                });
+            });
+        };
+        GeometryTransaction.prototype.toWkt = function (geometries, destWKID) {
+            if (destWKID === void 0) { destWKID = { wkid: 3826 }; }
+            return __awaiter$1(this, void 0, void 0, function () {
+                var destSpatialReference, projed, wktStr;
+                return __generator$1(this, function (_a) {
+                    destSpatialReference = new this.SpatialReference(destWKID);
+                    projed = this.clientProjection.project(geometries, destSpatialReference)[0];
+                    this.wicket.fromObject(projed);
+                    wktStr = this.wicket.write();
+                    console.log("[convertToWkt result]", wktStr);
+                    return [2 /*return*/, wktStr];
+                });
+            });
+        };
+        GeometryTransaction.prototype.toArcgis = function (wkt, srcWKID, destWKID) {
+            if (destWKID === void 0) { destWKID = { wkid: 102443 }; }
+            return __awaiter$1(this, void 0, void 0, function () {
+                var geometries, projectParameters, res;
+                return __generator$1(this, function (_a) {
+                    switch (_a.label) {
+                        case 0:
+                            this.wicket.read(wkt);
+                            geometries = this.wicket.toObject({ spatialReference: srcWKID });
+                            projectParameters = new this.ProjectParameters({
+                                geometries: geometries,
+                                outSpatialReference: new this.SpatialReference(destWKID),
+                            });
+                            return [4 /*yield*/, this.gsrv.project(projectParameters)];
+                        case 1:
+                            res = (_a.sent())[0];
+                            console.log("[ convertArcgis ]", res);
+                            return [2 /*return*/, res];
+                    }
+                });
+            });
+        };
+        return GeometryTransaction;
+    }());
+    var EventHub = /** @class */ (function () {
+        function EventHub() {
+            this.callstack = {};
+        }
+        EventHub.prototype.on = function (eventname, fn) {
+            this.callstack[eventname] = this.callstack[eventname] || [];
+            this.callstack[eventname].push(fn);
+        };
+        EventHub.prototype.emit = function (eventname, data) {
+            if (this.callstack[eventname] === undefined)
+                return;
+            this.callstack[eventname].forEach(function (fn) { return fn(data); });
+        };
+        EventHub.prototype.off = function (eventname, fn) {
+            if (this.callstack[eventname] === undefined || this.callstack[eventname].length === 0)
+                return;
+            var i = this.callstack[eventname].indexOf(fn);
+            if (i === -1)
+                return;
+            this.callstack[eventname].splice(i, 1);
+        };
+        return EventHub;
+    }());
+
+    var __extends$1 = (undefined && undefined.__extends) || (function () {
+        var extendStatics = function (d, b) {
+            extendStatics = Object.setPrototypeOf ||
+                ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
+                function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
+            return extendStatics(d, b);
+        };
+        return function (d, b) {
+            extendStatics(d, b);
+            function __() { this.constructor = d; }
+            d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+        };
+    })();
     var __awaiter$2 = (undefined && undefined.__awaiter) || function (thisArg, _arguments, P, generator) {
         function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
         return new (P || (P = Promise))(function (resolve, reject) {
@@ -8175,347 +8312,950 @@ var init = (function (exports) {
             if (op[0] & 5) throw op[1]; return { value: op[0] ? op[1] : void 0, done: true };
         }
     };
-    var Init = /** @class */ (function () {
-        function Init() {
+    var __rest = (undefined && undefined.__rest) || function (s, e) {
+        var t = {};
+        for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p) && e.indexOf(p) < 0)
+            t[p] = s[p];
+        if (s != null && typeof Object.getOwnPropertySymbols === "function")
+            for (var i = 0, p = Object.getOwnPropertySymbols(s); i < p.length; i++) {
+                if (e.indexOf(p[i]) < 0 && Object.prototype.propertyIsEnumerable.call(s, p[i]))
+                    t[p[i]] = s[p[i]];
+            }
+        return t;
+    };
+    /**
+     *
+     * LAYER 類 3.X 到 4.X 異動對照 :
+     * ArcGISDynamicMapServiceLayer => MapImageLayerProperties
+     * *ArcGISTiledMapServiceLayer => TileLayer
+     * FeatureLayer
+     * GraphicsLayer
+     * WMTSLayer
+     * WMSLayer
+     * *WebTiledLayer => WebTileLayer
+     * OpenStreetMapLayer
+     * ?*GoogleMapsLayer
+     * ?*SGSTileLayer
+     *
+     * @class ImageParameters
+     * @urlv3 https://sigma.madrid.es/arcgis_js_api/sdk/3.22/jsapi/imageparameters-amd.html
+     * @urlv4 https://developers.arcgis.com/javascript/latest/api-reference/esri-layers-support-ImageParameters.html
+     *
+     */
+    var Layer = /** @class */ (function () {
+        //- 拆分部分自定義屬性 作為 父類成員Layer 提供子類 直接使用
+        function Layer(moduleUrl, props) {
+            this.props = props;
+            this.moduleUrl = moduleUrl;
         }
-        /**@see https://developers.arcgis.com/javascript/latest/api-reference/esri-config.html */
-        Init.prototype.setEsriConfig = function (config) {
+        //- 返回實例
+        Layer.prototype._init = function () {
             return __awaiter$2(this, void 0, void 0, function () {
-                var _a;
-                return __generator$2(this, function (_b) {
-                    switch (_b.label) {
-                        case 0:
-                            _a = this;
-                            return [4 /*yield*/, loadModule("esri/config")];
-                        case 1:
-                            _a.esriConfig = _b.sent();
-                            return [2 /*return*/];
+                return __generator$2(this, function (_a) {
+                    switch (_a.label) {
+                        case 0: return [4 /*yield*/, loadModule(this.moduleUrl)];
+                        case 1: return [2 /*return*/, new (_a.sent())(this.props)];
                     }
                 });
             });
         };
-        Init.prototype.setEsriConfigRequestInterceptors = function (tables) {
+        //- 可被覆寫或直接呼叫
+        Layer.prototype.create = function () {
             return __awaiter$2(this, void 0, void 0, function () {
-                var _this = this;
                 return __generator$2(this, function (_a) {
-                    tables.forEach(function (_a) {
-                        var srcUrl = _a.srcUrl, destUrl = _a.destUrl, proxyer = _a.proxyer;
-                        var RequestInterceptor = {
-                            before: function (_a) {
-                                var url = _a.url;
-                                if (url !== srcUrl)
-                                    return;
-                                url = destUrl ? destUrl : proxyer + "?" + url;
-                            },
-                            error: function () { return console.error("srcUrl " + srcUrl + ",destUrl " + destUrl + ",proxyer " + proxyer); }
-                        };
-                        _this.esriConfig.request.interceptors.push(RequestInterceptor);
-                    });
-                    return [2 /*return*/];
+                    switch (_a.label) {
+                        case 0: return [4 /*yield*/, this._init()];
+                        case 1: return [2 /*return*/, _a.sent()];
+                    }
                 });
             });
         };
-        Init.prototype.create2D = function (mapConfig, viewConfig) {
+        return Layer;
+    }());
+    var MapImageLayer = /** @class */ (function (_super) {
+        __extends$1(MapImageLayer, _super);
+        function MapImageLayer() {
+            return _super !== null && _super.apply(this, arguments) || this;
+        }
+        MapImageLayer.prototype.create = function () {
             return __awaiter$2(this, void 0, void 0, function () {
-                var MAP_URL, Map, View, Home;
+                var IDs;
+                var _this = this;
                 return __generator$2(this, function (_a) {
                     switch (_a.label) {
                         case 0:
-                            MAP_URL = mapConfig && mapConfig.hasOwnProperty('portalItem') ? "WebMap" : "Map";
-                            return [4 /*yield*/, loadModule("esri/" + MAP_URL)];
-                        case 1:
-                            Map = (_a.sent());
-                            return [4 /*yield*/, loadModule("esri/views/MapView")];
-                        case 2:
-                            View = (_a.sent());
-                            this.defaultExtent = viewConfig.extent;
-                            this.map = new Map(mapConfig);
-                            this.view = new View(__assign(__assign({}, viewConfig), { map: this.map }));
-                            return [4 /*yield*/, this.setMapViewConstraintsLods(this.view)];
-                        case 3:
-                            _a.sent();
-                            this.view.ui.components = [];
-                            return [4 /*yield*/, loadModule("esri/widgets/Home")];
-                        case 4:
-                            Home = _a.sent();
-                            this.backDefaultExtentWidget = new Home({
-                                view: this.view
+                            this.props.listMode = "hide-children"; // arcgis's LayerList widget
+                            if (!this.props.hasOwnProperty("sublayers")) {
+                                this.props.sublayers = [];
+                            }
+                            IDs = this.props.LayerIds.split(",").map(function (i) { return +i; }).sort(function (a, b) { return b - a; });
+                            // console.log("[IDs]",IDs)
+                            /** descending @see https://community.esri.com/thread/216434-how-to-control-sublayer-visibility-in-47-mapimagelayer */
+                            IDs.forEach(function (id) {
+                                _this.props.sublayers.push({
+                                    id: id,
+                                    visible: true
+                                });
                             });
+                            return [4 /*yield*/, this._init()];
+                        case 1: 
+                        // console.log("[this.props.sublayers]",this.props)
+                        // console.log("[this.props.sublayers]",this.props.sublayers)
+                        return [2 /*return*/, _a.sent()];
+                    }
+                });
+            });
+        };
+        return MapImageLayer;
+    }(Layer));
+    var TileLayer = /** @class */ (function (_super) {
+        __extends$1(TileLayer, _super);
+        function TileLayer() {
+            return _super !== null && _super.apply(this, arguments) || this;
+        }
+        return TileLayer;
+    }(Layer));
+    var FeatureLayer = /** @class */ (function (_super) {
+        __extends$1(FeatureLayer, _super);
+        function FeatureLayer() {
+            return _super !== null && _super.apply(this, arguments) || this;
+        }
+        return FeatureLayer;
+    }(Layer));
+    var GraphicsLayer = /** @class */ (function (_super) {
+        __extends$1(GraphicsLayer, _super);
+        function GraphicsLayer() {
+            return _super !== null && _super.apply(this, arguments) || this;
+        }
+        return GraphicsLayer;
+    }(Layer));
+    var WMSLayer = /** @class */ (function (_super) {
+        __extends$1(WMSLayer, _super);
+        function WMSLayer() {
+            return _super !== null && _super.apply(this, arguments) || this;
+        }
+        return WMSLayer;
+    }(Layer));
+    var WebTileLayer = /** @class */ (function (_super) {
+        __extends$1(WebTileLayer, _super);
+        function WebTileLayer() {
+            return _super !== null && _super.apply(this, arguments) || this;
+        }
+        return WebTileLayer;
+    }(Layer));
+    var OpenStreetMapLayer = /** @class */ (function (_super) {
+        __extends$1(OpenStreetMapLayer, _super);
+        function OpenStreetMapLayer() {
+            return _super !== null && _super.apply(this, arguments) || this;
+        }
+        return OpenStreetMapLayer;
+    }(Layer));
+    var SceneLayer = /** @class */ (function (_super) {
+        __extends$1(SceneLayer, _super);
+        function SceneLayer() {
+            return _super !== null && _super.apply(this, arguments) || this;
+        }
+        return SceneLayer;
+    }(Layer));
+    // class GoogleMapsLayer extends Layer{}
+    var WMTSLayer = /** @class */ (function (_super) {
+        __extends$1(WMTSLayer, _super);
+        function WMTSLayer() {
+            return _super !== null && _super.apply(this, arguments) || this;
+        }
+        // @override
+        WMTSLayer.prototype.create = function () {
+            return __awaiter$2(this, void 0, void 0, function () {
+                var deSerialize_properties, remaped_wmtss_properties, _a;
+                return __generator$2(this, function (_b) {
+                    switch (_b.label) {
+                        case 0:
+                            deSerialize_properties = JSON.parse(this.props.UserSetting);
+                            remaped_wmtss_properties = {};
+                            if ('wmtsLayerInfo' in deSerialize_properties) {
+                                remaped_wmtss_properties.id = deSerialize_properties['wmtsLayerInfo']['identifier'];
+                                remaped_wmtss_properties.tileMatrixSetId = deSerialize_properties['wmtsLayerInfo']['tileMatrixSet'];
+                                remaped_wmtss_properties.imageFormat = deSerialize_properties['wmtsLayerInfo']['format'];
+                            }
+                            _a = this.props;
+                            return [4 /*yield*/, loadModule("esri/layers/support/WMTSSublayer")];
+                        case 1:
+                            _a.activeLayer = new (_b.sent())(remaped_wmtss_properties);
+                            return [4 /*yield*/, loadModule("esri/layers/WMTSLayer")];
+                        case 2: return [2 /*return*/, new (_b.sent())(this.props)];
+                    }
+                });
+            });
+        };
+        return WMTSLayer;
+    }(Layer));
+    var LayerFactory = /** @class */ (function () {
+        function LayerFactory(map) {
+            //- *_bucket 為地圖實例 參考
+            this.baseLayer_bucket = [];
+            this.layer_bucket = [];
+            this.graphiclayer_bucket = [];
+            //- defLoadLyr 僅保存為建構需要的屬性(已匹配)
+            this.notDefaultLoadLayerProps = [];
+            this._Map = map;
+        }
+        LayerFactory.prototype.LegendViewModel = function (view) {
+            return __awaiter$2(this, void 0, void 0, function () {
+                var LegendViewModel;
+                return __generator$2(this, function (_a) {
+                    switch (_a.label) {
+                        case 0: return [4 /*yield*/, loadModule("esri/widgets/Legend/LegendViewModel")];
+                        case 1:
+                            LegendViewModel = _a.sent();
+                            return [2 /*return*/, new LegendViewModel({ view: view })];
+                    }
+                });
+            });
+        };
+        LayerFactory.prototype.addRawLayer = function (type, _a) {
+            var ArcgisLayerOption = _a.ArcgisLayerOption, DataStatus = _a.DataStatus, DefLoadLyr = _a.DefLoadLyr, ID = _a.ID, MGroup = _a.MGroup, SubGroup = _a.SubGroup, LayerIds = _a.LayerIds, MaxScale = _a.MaxScale, MinScale = _a.MinScale, Opacity = _a.Opacity, UserSetting = _a.UserSetting, Visible = _a.Visible, AgsToken = _a.AgsToken, isExplain = _a.isExplain, ImgUrl = _a.ImgUrl, Datatype = _a.Datatype, LayerName = _a.LayerName, MapSrvUrl = _a.MapSrvUrl, args = __rest(_a, ["ArcgisLayerOption", "DataStatus", "DefLoadLyr", "ID", "MGroup", "SubGroup", "LayerIds", "MaxScale", "MinScale", "Opacity", "UserSetting", "Visible", "AgsToken", "isExplain", "ImgUrl", "Datatype", "LayerName", "MapSrvUrl"]);
+            return __awaiter$2(this, void 0, void 0, function () {
+                var layerOpts_1, ptr, idx, layer_instance, e_1;
+                return __generator$2(this, function (_b) {
+                    switch (_b.label) {
+                        case 0:
+                            _b.trys.push([0, 19, , 20]);
+                            console.log("[ addRawLayer: unexpected args ]", args);
+                            layerOpts_1 = {
+                                id: String(ID || args['id'] || "layer_" + this._Map.layers.length),
+                                title: LayerName || args['name'] || args['title'] || "layer_" + this._Map.layers.length,
+                                opacity: Opacity || args['opacity'] || 1,
+                                visible: Visible || args['visible'] || true,
+                                url: MapSrvUrl || args["url"],
+                                minScale: MinScale || args['minScale'] || 0,
+                                maxScale: MaxScale || args['maxScale'] || 0,
+                                ArcgisLayerOption: ArcgisLayerOption,
+                                DataStatus: DataStatus,
+                                DefLoadLyr: DefLoadLyr || args['defLoadLyr'] || false,
+                                MGroup: MGroup || args['mgroup'],
+                                SubGroup: SubGroup || args['subGroup'] || args['sgroup'],
+                                LayerIds: LayerIds || args["layerIds"],
+                                UserSetting: UserSetting || args["userSetting"] || Object.create(null),
+                                AgsToken: AgsToken,
+                                isExplain: isExplain,
+                                ImgUrl: ImgUrl || args["imgUrl"],
+                                Datatype: Datatype || args["layerType"] || args["LayerType"] || args["dataType"]
+                            };
+                            console.log("[ addRawLayer: build layerOpts ]", layerOpts_1);
+                            // ensure visible is true when "DefLoadLyr" is true
+                            if (layerOpts_1.DefLoadLyr)
+                                layerOpts_1.visible = true;
+                            // check notDefaultLoadLayerProps
+                            if (!layerOpts_1.DefLoadLyr && type !== 'graphiclayer') {
+                                ptr = this.notDefaultLoadLayerProps.find(function (tl) { return tl.id == layerOpts_1.id; });
+                                if (!ptr) { // just keep
+                                    this.notDefaultLoadLayerProps.push(layerOpts_1);
+                                    return [2 /*return*/];
+                                }
+                                idx = this.notDefaultLoadLayerProps.indexOf(ptr);
+                                this.notDefaultLoadLayerProps.splice(idx, 1);
+                            }
+                            layer_instance = void 0;
+                            if (!/^ArcGISDynamicMapServiceLayer$|^MapImageLayer$/ig.test(layerOpts_1.Datatype)) return [3 /*break*/, 2];
+                            return [4 /*yield*/, new MapImageLayer("esri/layers/MapImageLayer", layerOpts_1).create()];
+                        case 1:
+                            layer_instance = _b.sent();
+                            return [3 /*break*/, 18];
+                        case 2:
+                            if (!/FeatureLayer/ig.test(layerOpts_1.Datatype)) return [3 /*break*/, 4];
+                            return [4 /*yield*/, new FeatureLayer("esri/layers/FeatureLayer", layerOpts_1).create()];
+                        case 3:
+                            layer_instance = _b.sent();
+                            return [3 /*break*/, 18];
+                        case 4:
+                            if (!/GraphicsLayer/ig.test(layerOpts_1.Datatype)) return [3 /*break*/, 6];
+                            return [4 /*yield*/, new GraphicsLayer("esri/layers/GraphicsLayer", layerOpts_1).create()];
+                        case 5:
+                            layer_instance = _b.sent();
+                            return [3 /*break*/, 18];
+                        case 6:
+                            if (!/WMTSLayer/ig.test(layerOpts_1.Datatype)) return [3 /*break*/, 8];
+                            return [4 /*yield*/, new WMTSLayer("esri/layers/WMTSLayer", layerOpts_1).create()];
+                        case 7:
+                            layer_instance = _b.sent();
+                            return [3 /*break*/, 18];
+                        case 8:
+                            if (!/WMSLayer/ig.test(layerOpts_1.Datatype)) return [3 /*break*/, 10];
+                            return [4 /*yield*/, new WMSLayer("esri/layers/WMSLayer", layerOpts_1).create()];
+                        case 9:
+                            layer_instance = _b.sent();
+                            return [3 /*break*/, 18];
+                        case 10:
+                            if (!/OpenStreetMapLayer/ig.test(layerOpts_1.Datatype)) return [3 /*break*/, 12];
+                            return [4 /*yield*/, new OpenStreetMapLayer("esri/layers/OpenStreetMapLayer", layerOpts_1).create()];
+                        case 11:
+                            layer_instance = _b.sent();
+                            return [3 /*break*/, 18];
+                        case 12:
+                            if (!/SceneLayer/ig.test(layerOpts_1.Datatype)) return [3 /*break*/, 14];
+                            return [4 /*yield*/, new SceneLayer("esri/layers/SceneLayer", layerOpts_1).create()];
+                        case 13:
+                            layer_instance = _b.sent();
+                            return [3 /*break*/, 18];
+                        case 14:
+                            if (!/^ArcGISTiledMapServiceLayer$|^TileLayer$/ig.test(layerOpts_1.Datatype)) return [3 /*break*/, 16];
+                            return [4 /*yield*/, new TileLayer("esri/layers/TileLayer", layerOpts_1).create()];
+                        case 15:
+                            layer_instance = _b.sent();
+                            return [3 /*break*/, 18];
+                        case 16:
+                            if (!/^WebTileLayer$|^WebTiledLayer$/ig.test(layerOpts_1.Datatype)) return [3 /*break*/, 18];
+                            return [4 /*yield*/, new WebTileLayer("esri/layers/WebTileLayer", layerOpts_1).create()];
+                        case 17:
+                            layer_instance = _b.sent();
+                            _b.label = 18;
+                        case 18:
+                            this._Map.add(layer_instance);
+                            this._handleLayerGroup(type, layer_instance);
+                            return [2 /*return*/, layer_instance];
+                        case 19:
+                            e_1 = _b.sent();
+                            throw new Error("addRawLayer() : " + e_1);
+                        case 20: return [2 /*return*/];
+                    }
+                });
+            });
+        };
+        LayerFactory.prototype._handleLayerGroup = function (type, layer_instance) {
+            var _this = this;
+            switch (type) {
+                case "baseLayer":
+                    this.baseLayer_bucket.push(layer_instance);
+                    //- 保持"加入"的底圖在最上方 並且唯一開啟
+                    if (this.baseLayer_bucket.length !== 1) {
+                        layer_instance.visible = false;
+                    }
+                    this._Map.reorder(layer_instance, this.baseLayer_bucket.length - 1);
+                    break;
+                case "layer":
+                    //- 覆蓋有相同 ID 的狀態
+                    this.layer_bucket = this.layer_bucket.filter(function (l) { return l.id !== layer_instance.id; });
+                    this.layer_bucket.push(layer_instance);
+                    break;
+                case "graphiclayer":
+                    this.graphiclayer_bucket.push(layer_instance);
+                    break;
+            }
+            //- 保持繪圖圖層都在地圖最上方
+            this.graphiclayer_bucket.length > 0 && this.graphiclayer_bucket.forEach(function (ptr) {
+                _this._Map.reorder(ptr, _this._Map.layers.length - 1);
+            });
+            console.log("[ layer_bucket ]", this.layer_bucket);
+            console.log("[ baseLayer_bucket ]", this.baseLayer_bucket);
+            console.log("[ graphiclayer_bucket ]", this.graphiclayer_bucket);
+        };
+        LayerFactory.prototype.reorderInBucket = function (props, index) {
+            try {
+                var ptr = this[props.type + "_bucket"].find(function (el) { return el.id === props.id; });
+                switch (props.type) {
+                    case "layer":
+                        this._Map.reorder(ptr, this.baseLayer_bucket.length + this.layer_bucket.length - index - 1);
+                        break;
+                    case "baseLayer":
+                        this._Map.reorder(ptr, index);
+                        break;
+                    case "graphiclayer":
+                        this._Map.reorder(ptr, this.baseLayer_bucket.length + this.layer_bucket.length + this.graphiclayer_bucket.length - index - 1);
+                        break;
+                }
+            }
+            catch (e) {
+                throw new Error(e);
+            }
+        };
+        LayerFactory.prototype.handleVisibilityInBucket = function (props, value) {
+            try {
+                var ptr = this[props.type + "_bucket"].find(function (el) { return el.id === props.id; });
+                ptr.visible = value;
+            }
+            catch (e) {
+                throw new Error(e);
+            }
+        };
+        LayerFactory.prototype.handleOpacityInBucket = function (props, value) {
+            try {
+                var ptr = this[props.type + "_bucket"].find(function (el) { return el.id === props.id; });
+                ptr.opacity = value > 1 ? value / 100 : value;
+            }
+            catch (e) {
+                throw new Error(e);
+            }
+        };
+        //- for baseMap : singleton
+        LayerFactory.prototype.handleBaseLayerVisibility = function (id) {
+            this.baseLayer_bucket.forEach(function (bLyr) {
+                bLyr.visible = bLyr.id === id;
+            });
+        };
+        LayerFactory.prototype.handleBaseLayerOpacity = function (value) {
+            this.baseLayer_bucket.forEach(function (bLyr) {
+                if (bLyr.visible) {
+                    bLyr.opacity = value > 1 ? value / 100 : value;
+                }
+            });
+        };
+        //- for normal layer
+        LayerFactory.prototype.handleLayerVisibility = function (id, value) {
+            this.handleVisibilityInBucket({
+                type: "layer",
+                id: id
+            }, value);
+        };
+        LayerFactory.prototype.handleLayerOpacity = function (id, value) {
+            this.handleOpacityInBucket({
+                type: "layer",
+                id: id
+            }, value);
+        };
+        LayerFactory.prototype.removeInBucket = function (props) {
+            try {
+                var bucket = this[props.type + "_bucket"];
+                //- 從對應 BUCKET 找到對應圖層
+                var ptr = bucket.find(function (el) { return el.id === props.id; });
+                this._Map.remove(ptr);
+            }
+            catch (e) {
+                throw new Error(e);
+            }
+        };
+        return LayerFactory;
+    }());
+
+    var __assign = (undefined && undefined.__assign) || function () {
+        __assign = Object.assign || function(t) {
+            for (var s, i = 1, n = arguments.length; i < n; i++) {
+                s = arguments[i];
+                for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p))
+                    t[p] = s[p];
+            }
+            return t;
+        };
+        return __assign.apply(this, arguments);
+    };
+    var __awaiter$3 = (undefined && undefined.__awaiter) || function (thisArg, _arguments, P, generator) {
+        function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+        return new (P || (P = Promise))(function (resolve, reject) {
+            function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+            function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+            function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+            step((generator = generator.apply(thisArg, _arguments || [])).next());
+        });
+    };
+    var __generator$3 = (undefined && undefined.__generator) || function (thisArg, body) {
+        var _ = { label: 0, sent: function() { if (t[0] & 1) throw t[1]; return t[1]; }, trys: [], ops: [] }, f, y, t, g;
+        return g = { next: verb(0), "throw": verb(1), "return": verb(2) }, typeof Symbol === "function" && (g[Symbol.iterator] = function() { return this; }), g;
+        function verb(n) { return function (v) { return step([n, v]); }; }
+        function step(op) {
+            if (f) throw new TypeError("Generator is already executing.");
+            while (_) try {
+                if (f = 1, y && (t = op[0] & 2 ? y["return"] : op[0] ? y["throw"] || ((t = y["return"]) && t.call(y), 0) : y.next) && !(t = t.call(y, op[1])).done) return t;
+                if (y = 0, t) op = [op[0] & 2, t.value];
+                switch (op[0]) {
+                    case 0: case 1: t = op; break;
+                    case 4: _.label++; return { value: op[1], done: false };
+                    case 5: _.label++; y = op[1]; op = [0]; continue;
+                    case 7: op = _.ops.pop(); _.trys.pop(); continue;
+                    default:
+                        if (!(t = _.trys, t = t.length > 0 && t[t.length - 1]) && (op[0] === 6 || op[0] === 2)) { _ = 0; continue; }
+                        if (op[0] === 3 && (!t || (op[1] > t[0] && op[1] < t[3]))) { _.label = op[1]; break; }
+                        if (op[0] === 6 && _.label < t[1]) { _.label = t[1]; t = op; break; }
+                        if (t && _.label < t[2]) { _.label = t[2]; _.ops.push(op); break; }
+                        if (t[2]) _.ops.pop();
+                        _.trys.pop(); continue;
+                }
+                op = body.call(thisArg, _);
+            } catch (e) { op = [6, e]; y = 0; } finally { f = t = 0; }
+            if (op[0] & 5) throw op[1]; return { value: op[0] ? op[1] : void 0, done: true };
+        }
+    };
+    var BaseDraw = /** @class */ (function () {
+        function BaseDraw(view, map) {
+            this.pointSymbol = {
+                type: "picture-marker",
+                url: "data:image/svg+xml;utf8;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iaXNvLTg4NTktMSI/Pgo8IS0tIEdlbmVyYXRvcjogQWRvYmUgSWxsdXN0cmF0b3IgMTkuMC4wLCBTVkcgRXhwb3J0IFBsdWctSW4gLiBTVkcgVmVyc2lvbjogNi4wMCBCdWlsZCAwKSAgLS0+CjxzdmcgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIiB4bWxuczp4bGluaz0iaHR0cDovL3d3dy53My5vcmcvMTk5OS94bGluayIgdmVyc2lvbj0iMS4xIiBpZD0iTGF5ZXJfMSIgeD0iMHB4IiB5PSIwcHgiIHZpZXdCb3g9IjAgMCA0ODYuMyA0ODYuMyIgc3R5bGU9ImVuYWJsZS1iYWNrZ3JvdW5kOm5ldyAwIDAgNDg2LjMgNDg2LjM7IiB4bWw6c3BhY2U9InByZXNlcnZlIiB3aWR0aD0iNTEycHgiIGhlaWdodD0iNTEycHgiPgo8Zz4KCTxwYXRoIHN0eWxlPSJmaWxsOiNDRDJBMDA7IiBkPSJNMjQzLjE1LDB2MTA0LjRjNDQuMTEsMCw4MCwzNS44OCw4MCw4MGMwLDQ0LjExLTM1Ljg5LDgwLTgwLDgwdjIyMS45bDE0Ni40My0xODQuMSAgIGMyNi4yOS0zMy4yNSw0MC4xOS03My4yMSw0MC4xOS0xMTUuNThDNDI5Ljc3LDgzLjcyLDM0Ni4wNSwwLDI0My4xNSwweiIvPgoJPHBhdGggc3R5bGU9ImZpbGw6I0Q4RDdEQTsiIGQ9Ik0zMjMuMTUsMTg0LjRjMC00NC4xMi0zNS44OS04MC04MC04MHYxNjBDMjg3LjI2LDI2NC40LDMyMy4xNSwyMjguNTEsMzIzLjE1LDE4NC40eiIvPgoJPHBhdGggc3R5bGU9ImZpbGw6I0ZGMzUwMTsiIGQ9Ik0xNjMuMTUsMTg0LjRjMC00NC4xMiwzNS44OS04MCw4MC04MFYwQzE0MC4yNSwwLDU2LjUzLDgzLjcyLDU2LjUzLDE4Ni42MiAgIGMwLDQyLjM3LDEzLjksODIuMzMsNDAuMjMsMTE1LjYyTDI0My4xNSw0ODYuM1YyNjQuNEMxOTkuMDQsMjY0LjQsMTYzLjE1LDIyOC41MSwxNjMuMTUsMTg0LjR6Ii8+Cgk8cGF0aCBzdHlsZT0iZmlsbDojRkZGRkZGOyIgZD0iTTE2My4xNSwxODQuNGMwLDQ0LjExLDM1Ljg5LDgwLDgwLDgwdi0xNjBDMTk5LjA0LDEwNC40LDE2My4xNSwxNDAuMjgsMTYzLjE1LDE4NC40eiIvPgo8L2c+CjxnPgo8L2c+CjxnPgo8L2c+CjxnPgo8L2c+CjxnPgo8L2c+CjxnPgo8L2c+CjxnPgo8L2c+CjxnPgo8L2c+CjxnPgo8L2c+CjxnPgo8L2c+CjxnPgo8L2c+CjxnPgo8L2c+CjxnPgo8L2c+CjxnPgo8L2c+CjxnPgo8L2c+CjxnPgo8L2c+Cjwvc3ZnPgo=",
+                width: 20,
+                height: 20,
+                yoffset: 10
+            };
+            this.polygonSymbol = {
+                type: "simple-fill",
+                color: [0, 0, 255, 0.2],
+                outline: {
+                    color: [5, 5, 100, 0.95],
+                    width: 1.2
+                }
+            };
+            this.polylineSymbol = {
+                type: "simple-line",
+                color: [4, 90, 141],
+                width: 1,
+                cap: "round",
+                join: "round"
+            };
+            this.view = view;
+            this.map = map;
+        }
+        BaseDraw.prototype.load = function () {
+            return __awaiter$3(this, void 0, void 0, function () {
+                var _a, _b, _c, _d, layerFactory, _e;
+                return __generator$3(this, function (_f) {
+                    switch (_f.label) {
+                        case 0:
+                            _a = this;
+                            return [4 /*yield*/, loadModule("esri/Graphic")];
+                        case 1:
+                            _a.Graphic = _f.sent();
+                            _b = this;
+                            return [4 /*yield*/, loadModule("esri/geometry/geometryEngineAsync")];
+                        case 2:
+                            _b.Engine = _f.sent();
+                            _c = this;
+                            return [4 /*yield*/, loadModule("esri/geometry/Circle")];
+                        case 3:
+                            _c.Circle = _f.sent();
+                            _d = this;
+                            return [4 /*yield*/, new GeometryTransaction().load()
+                                // auto create graphicslayer
+                            ];
+                        case 4:
+                            _d.geometryTransaction = _f.sent();
+                            layerFactory = new LayerFactory(this.map);
+                            _e = this;
+                            return [4 /*yield*/, layerFactory.addRawLayer("graphiclayer", {
+                                    ID: "Auto-Created-BaseDraw-" + Date.now(),
+                                    Datatype: "graphicslayer",
+                                    LayerName: "Auto-Created-BaseDraw",
+                                })];
+                        case 5:
+                            _e.glyr = _f.sent();
                             return [2 /*return*/, this];
                     }
                 });
             });
         };
-        // todo
-        // async create3D(
-        //     mapConfig: __esri.WebSceneProperties,
-        //     viewConfig:__esri.SceneViewProperties
-        // ):Promise<Init>{
-        //     const WEBSCENE_URL = mapConfig && ('portalItem' in mapConfig) ? "WebScene" : "Map"
-        //     const Map = await loadModule< __esri.MapConstructor>(`esri/${WEBSCENE_URL}`)
-        //     const View = await loadModule<__esri.SceneViewConstructor>(`esri/views/SceneView`)
-        //     this.map = new Map(mapConfig)
-        //     this.view = new View ({...viewConfig,map:this.map})
-        //     this.view.ui.components= []
-        //     return this
-        // }
-        /**
-         * 設置 ARCGIS 預設工具 到 ARCGIS UI 指定的位置
-         * @see https://developers.arcgis.com/javascript/latest/api-reference/esri-views-ui-DefaultUI.html
-         */
-        Init.prototype.setMapUI = function (components, position) {
-            return __awaiter$2(this, void 0, void 0, function () {
-                var e_1;
-                return __generator$2(this, function (_a) {
+        /** convert graphics in "this.glyr" to wkt */
+        BaseDraw.prototype.getWkt = function () {
+            return __awaiter$3(this, void 0, void 0, function () {
+                var geometries, geometriesUnioned;
+                return __generator$3(this, function (_a) {
                     switch (_a.label) {
                         case 0:
-                            _a.trys.push([0, 5, , 6]);
-                            if (!/bottom-right|bottom-left|top-left|top-right'/ig.test(position)) return [3 /*break*/, 2];
-                            this.view.ui.components = components;
-                            return [4 /*yield*/, this.view.when()];
+                            geometries = this.glyr.graphics.toArray().map(function (_a) {
+                                var geometry = _a.geometry;
+                                return geometry;
+                            }).filter(function (g) { return g; });
+                            return [4 /*yield*/, this.Engine.union(geometries)];
                         case 1:
-                            _a.sent();
-                            this.view.ui.move(['compass', 'zoom'], position);
-                            return [3 /*break*/, 3];
+                            geometriesUnioned = _a.sent();
+                            return [4 /*yield*/, this.geometryTransaction.toWkt([geometriesUnioned])];
+                        case 2: return [2 /*return*/, _a.sent()];
+                    }
+                });
+            });
+        };
+        BaseDraw.prototype.addGraphic = function (wkt, symbolOpts) {
+            return __awaiter$3(this, void 0, void 0, function () {
+                var geometry;
+                return __generator$3(this, function (_a) {
+                    switch (_a.label) {
+                        case 0: return [4 /*yield*/, this.geometryTransaction.toArcgis(wkt, { wkid: 102443 }, this.view.spatialReference)];
+                        case 1:
+                            geometry = _a.sent();
+                            this.glyr.graphics.removeAll();
+                            this.glyr.add(new this.Graphic({
+                                geometry: geometry,
+                                symbol: __assign(__assign({}, (geometry.type === 'point' ? this.pointSymbol : this.polygonSymbol)), symbolOpts)
+                            }));
+                            return [2 /*return*/, this.glyr];
+                    }
+                });
+            });
+        };
+        BaseDraw.prototype.clearGraphics = function (type) {
+            if (type === undefined) {
+                this.glyr.graphics.removeAll();
+                return;
+            }
+            for (var _i = 0, _a = this.glyr.graphics.toArray(); _i < _a.length; _i++) {
+                var graphic = _a[_i];
+                if (graphic.geometry.type === type) {
+                    this.glyr.graphics.remove(graphic);
+                }
+            }
+        };
+        /**
+         * todo: figure out why need "geodesicBuffer"
+         * @see https://developers.arcgis.com/javascript/latest/api-reference/esri-geometry-support-normalizeUtils.html
+         * @see https://developers.arcgis.com/javascript/latest/api-reference/esri-geometry-support-normalizeUtils.html#normalizeCentralMeridian
+         */
+        BaseDraw.prototype.buffGeometry = function (g, buffer) {
+            return __awaiter$3(this, void 0, void 0, function () {
+                var circle, simplePolygon, geodesicPolygon;
+                return __generator$3(this, function (_a) {
+                    switch (_a.label) {
+                        case 0:
+                            if (g.type === 'point') {
+                                circle = new this.Circle({
+                                    center: g,
+                                    radius: buffer,
+                                    radiusUnit: "meters",
+                                    spatialReference: this.view.spatialReference
+                                });
+                                return [2 /*return*/, circle];
+                            }
+                            return [4 /*yield*/, this.Engine.simplify(g)];
+                        case 1:
+                            simplePolygon = _a.sent();
+                            return [4 /*yield*/, this.Engine.geodesicBuffer(simplePolygon, buffer, "meters")];
                         case 2:
-                            if (Array.isArray(components) && components.length === 0) { //- assume to empty all
-                                this.view.ui.empty("bottom-right");
-                                this.view.ui.empty("bottom-left");
-                                this.view.ui.empty("top-left");
-                                this.view.ui.empty("top-right");
-                            }
-                            else {
-                                throw new TypeError("Illegal components:" + components.join('、') + "or Illegal position:" + position);
-                            }
-                            _a.label = 3;
-                        case 3: return [4 /*yield*/, this.view.when()];
+                            geodesicPolygon = _a.sent();
+                            return [2 /*return*/, geodesicPolygon];
+                    }
+                });
+            });
+        };
+        BaseDraw.prototype.destroy = function () {
+            this.clearGraphics();
+            this.map.remove(this.glyr);
+            console.log("[BaseDraw destroyed]");
+        };
+        return BaseDraw;
+    }());
+
+    var __extends$2 = (undefined && undefined.__extends) || (function () {
+        var extendStatics = function (d, b) {
+            extendStatics = Object.setPrototypeOf ||
+                ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
+                function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
+            return extendStatics(d, b);
+        };
+        return function (d, b) {
+            extendStatics(d, b);
+            function __() { this.constructor = d; }
+            d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+        };
+    })();
+    var __awaiter$4 = (undefined && undefined.__awaiter) || function (thisArg, _arguments, P, generator) {
+        function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+        return new (P || (P = Promise))(function (resolve, reject) {
+            function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+            function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+            function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+            step((generator = generator.apply(thisArg, _arguments || [])).next());
+        });
+    };
+    var __generator$4 = (undefined && undefined.__generator) || function (thisArg, body) {
+        var _ = { label: 0, sent: function() { if (t[0] & 1) throw t[1]; return t[1]; }, trys: [], ops: [] }, f, y, t, g;
+        return g = { next: verb(0), "throw": verb(1), "return": verb(2) }, typeof Symbol === "function" && (g[Symbol.iterator] = function() { return this; }), g;
+        function verb(n) { return function (v) { return step([n, v]); }; }
+        function step(op) {
+            if (f) throw new TypeError("Generator is already executing.");
+            while (_) try {
+                if (f = 1, y && (t = op[0] & 2 ? y["return"] : op[0] ? y["throw"] || ((t = y["return"]) && t.call(y), 0) : y.next) && !(t = t.call(y, op[1])).done) return t;
+                if (y = 0, t) op = [op[0] & 2, t.value];
+                switch (op[0]) {
+                    case 0: case 1: t = op; break;
+                    case 4: _.label++; return { value: op[1], done: false };
+                    case 5: _.label++; y = op[1]; op = [0]; continue;
+                    case 7: op = _.ops.pop(); _.trys.pop(); continue;
+                    default:
+                        if (!(t = _.trys, t = t.length > 0 && t[t.length - 1]) && (op[0] === 6 || op[0] === 2)) { _ = 0; continue; }
+                        if (op[0] === 3 && (!t || (op[1] > t[0] && op[1] < t[3]))) { _.label = op[1]; break; }
+                        if (op[0] === 6 && _.label < t[1]) { _.label = t[1]; t = op; break; }
+                        if (t && _.label < t[2]) { _.label = t[2]; _.ops.push(op); break; }
+                        if (t[2]) _.ops.pop();
+                        _.trys.pop(); continue;
+                }
+                op = body.call(thisArg, _);
+            } catch (e) { op = [6, e]; y = 0; } finally { f = t = 0; }
+            if (op[0] & 5) throw op[1]; return { value: op[0] ? op[1] : void 0, done: true };
+        }
+    };
+    var DrawPolyline = /** @class */ (function (_super) {
+        __extends$2(DrawPolyline, _super);
+        function DrawPolyline() {
+            var _this = _super !== null && _super.apply(this, arguments) || this;
+            _this.buffer = 0;
+            _this.timestampQueue = new Array();
+            return _this;
+        }
+        DrawPolyline.prototype.load = function () {
+            return __awaiter$4(this, void 0, void 0, function () {
+                var _a, _b, _c;
+                return __generator$4(this, function (_d) {
+                    switch (_d.label) {
+                        case 0: return [4 /*yield*/, _super.prototype.load.call(this)];
+                        case 1:
+                            _d.sent();
+                            _a = this;
+                            return [4 /*yield*/, loadModule("esri/geometry/Polyline")];
+                        case 2:
+                            _a.Polyline = _d.sent();
+                            _b = this;
+                            return [4 /*yield*/, loadModule("esri/views/draw/Draw")];
+                        case 3:
+                            _b.Draw = _d.sent();
+                            _c = this;
+                            return [4 /*yield*/, loadModule("esri/widgets/Sketch/SketchViewModel")];
                         case 4:
-                            _a.sent();
-                            return [3 /*break*/, 6];
-                        case 5:
-                            e_1 = _a.sent();
-                            console.error(e_1);
-                            return [3 /*break*/, 6];
-                        case 6: return [2 /*return*/];
+                            _c.SketchViewModel = _d.sent();
+                            this.tipText = new TipText(this.view);
+                            this.eventHub = new EventHub();
+                            return [2 /*return*/, this];
                     }
                 });
             });
         };
-        /**
-         * 限制 mpaView 範圍 : scale
-         * @returns {mapView}
-         * @see https://developers.arcgis.com/javascript/latest/api-reference/esri-views-MapView.html#constraints
-         */
-        Init.prototype.setMapViewConstraintsScale = function (view, scale) {
-            if (scale && scale.maxScale)
-                view.constraints.maxScale = scale.maxScale;
-            if (scale && scale.minScale)
-                view.constraints.minScale = scale.minScale;
-            return view;
+        DrawPolyline.prototype._addGraphicToGlyr = function (geometry, timestamp) {
+            return __awaiter$4(this, void 0, void 0, function () {
+                return __generator$4(this, function (_a) {
+                    this.glyr.add(new this.Graphic({
+                        geometry: geometry,
+                        attributes: { timestamp: timestamp },
+                        symbol: this.polylineSymbol
+                    }));
+                    return [2 /*return*/];
+                });
+            });
         };
-        /**
-         * 限制 mpaView 範圍 : lods (必要，否則空白底圖會使scale顯示不正常)
-         * @see https://developers.arcgis.com/javascript/latest/api-reference/esri-views-MapView.html#constraints
-         */
-        Init.prototype.setMapViewConstraintsLods = function (view, lods) {
-            return __awaiter$2(this, void 0, void 0, function () {
-                var Lod;
-                return __generator$2(this, function (_a) {
-                    switch (_a.label) {
+        DrawPolyline.prototype._addAndBuffGraphicToGlyr = function (geometry, timestamp) {
+            return __awaiter$4(this, void 0, void 0, function () {
+                var _a, _b, _c, _d, _e;
+                return __generator$4(this, function (_f) {
+                    switch (_f.label) {
                         case 0:
-                            lods = lods || [
-                                {
-                                    "level": 1,
-                                    "scale": 295828763.795777,
-                                    "resolution": 78271.5169639999
-                                },
-                                {
-                                    "level": 2,
-                                    "scale": 147914381.897889,
-                                    "resolution": 39135.7584820001
-                                },
-                                {
-                                    "level": 3,
-                                    "scale": 73957190.948944,
-                                    "resolution": 19567.8792409999
-                                },
-                                {
-                                    "level": 4,
-                                    "scale": 36978595.474472,
-                                    "resolution": 9783.93962049996
-                                },
-                                {
-                                    "level": 5,
-                                    "scale": 18489297.737236,
-                                    "resolution": 4891.96981024998
-                                },
-                                {
-                                    "level": 6,
-                                    "scale": 9244648.868618,
-                                    "resolution": 2445.98490512499
-                                },
-                                {
-                                    "level": 7,
-                                    "scale": 4622324.434309,
-                                    "resolution": 1222.99245256249
-                                },
-                                {
-                                    "level": 8,
-                                    "scale": 2311162.217155,
-                                    "resolution": 611.49622628138
-                                },
-                                {
-                                    "level": 9,
-                                    "scale": 1155581.108577,
-                                    "resolution": 305.748113140558
-                                },
-                                {
-                                    "level": 10,
-                                    "scale": 577790.554289,
-                                    "resolution": 152.874056570411
-                                },
-                                {
-                                    "level": 11,
-                                    "scale": 288895.277144,
-                                    "resolution": 76.4370282850732
-                                },
-                                {
-                                    "level": 12,
-                                    "scale": 144447.638572,
-                                    "resolution": 38.2185141425366
-                                },
-                                {
-                                    "level": 13,
-                                    "scale": 72223.819286,
-                                    "resolution": 19.1092570712683
-                                },
-                                {
-                                    "level": 14,
-                                    "scale": 36111.909643,
-                                    "resolution": 9.55462853563415
-                                },
-                                {
-                                    "level": 15,
-                                    "scale": 18055.954822,
-                                    "resolution": 4.77731426794937
-                                },
-                                {
-                                    "level": 16,
-                                    "scale": 9027.977411,
-                                    "resolution": 2.38865713397468
-                                },
-                                {
-                                    "level": 17,
-                                    "scale": 4513.988705,
-                                    "resolution": 1.19432856685505
-                                },
-                                {
-                                    "level": 18,
-                                    "scale": 2256.994353,
-                                    "resolution": 0.597164283559817
-                                },
-                                {
-                                    "level": 19,
-                                    "scale": 1128.4994333441377,
-                                    "resolution": 0.298582141647617
-                                },
-                                {
-                                    "level": 20,
-                                    "scale": 564.2497166720685,
-                                    "resolution": 0.1492910708238085
-                                },
-                                {
-                                    "level": 21,
-                                    "scale": 282.124294,
-                                    "resolution": 0.07464553541190416
-                                },
-                                {
-                                    "level": 22,
-                                    "scale": 141.062147,
-                                    "resolution": 0.03732276770595208
-                                },
-                                { "level": 23,
-                                    "scale": 70.5310735,
-                                    "resolution": 0.01866138385297604
-                                }
-                            ];
-                            return [4 /*yield*/, loadModule("esri/layers/support/LOD")];
+                            if (!this.buffer)
+                                return [2 /*return*/];
+                            _b = (_a = this.glyr).add;
+                            _d = (_c = this.Graphic).bind;
+                            _e = {};
+                            return [4 /*yield*/, this.buffGeometry(geometry, this.buffer)];
                         case 1:
-                            Lod = _a.sent();
-                            view.constraints.lods = lods.map(function (lod) { return new Lod(lod); });
-                            return [2 /*return*/, view];
+                            _b.apply(_a, [new (_d.apply(_c, [void 0, (_e.geometry = _f.sent(),
+                                        _e.attributes = { timestamp: timestamp },
+                                        _e.symbol = Object.assign(this.polylineSymbol, { join: "miter" }),
+                                        _e)]))()]);
+                            return [2 /*return*/];
                     }
                 });
             });
         };
-        /** 限制 mpaView 範圍 : extext (平移若超出預設 Extent 則自動回到預設) */
-        Init.prototype.setMapViewConstraintsExtent = function () {
+        DrawPolyline.prototype.clearGraphicsByTime = function (timestamp, type) {
+            for (var _i = 0, _a = this.glyr.graphics.toArray(); _i < _a.length; _i++) {
+                var graphic = _a[_i];
+                if (graphic.attributes.timestamp === timestamp || graphic.geometry.type === type) {
+                    this.glyr.graphics.remove(graphic);
+                }
+            }
+        };
+        DrawPolyline.prototype.draw = function () {
             var _this = this;
-            this.useExtentConstraint = true;
-            var outSide = false;
-            this.view.watch("extent", function (currentExtent) { return __awaiter$2(_this, void 0, void 0, function () {
-                var center;
-                return __generator$2(this, function (_a) {
-                    switch (_a.label) {
+            // init
+            var timestamp = Date.now();
+            this.drawAction = new this.Draw({ view: this.view }).create("polyline", { mode: "click" });
+            this.view.focus();
+            // start
+            this.tipText.setText("點擊地圖繪製起點");
+            this.drawAction.on([
+                'vertex-add',
+                'cursor-update',
+                'draw-complete'
+            ], function (evt) { return __awaiter$4(_this, void 0, void 0, function () {
+                var polyline, _a, t;
+                return __generator$4(this, function (_b) {
+                    switch (_b.label) {
                         case 0:
-                            if (!this.useExtentConstraint)
-                                return [2 /*return*/];
-                            center = currentExtent.center;
-                            if (outSide || !this.defaultExtent || !center)
-                                return [2 /*return*/];
-                            if (!(center.x < this.defaultExtent.xmin ||
-                                center.x > this.defaultExtent.xmax ||
-                                center.y < this.defaultExtent.ymin ||
-                                center.y > this.defaultExtent.ymax)) return [3 /*break*/, 2];
-                            outSide = true;
-                            return [4 /*yield*/, this.backDefaultExtentWidget.go()];
+                            polyline = new this.Polyline({
+                                paths: [evt.vertices],
+                                spatialReference: this.view.spatialReference
+                            });
+                            // if buffer ; only clear line 
+                            this.buffer > 0 ? this.clearGraphicsByTime(timestamp, 'polyline') : this.clearGraphicsByTime(timestamp);
+                            _a = evt.type;
+                            switch (_a) {
+                                case 'vertex-add': return [3 /*break*/, 1];
+                                case 'cursor-update': return [3 /*break*/, 4];
+                                case 'draw-complete': return [3 /*break*/, 5];
+                            }
+                            return [3 /*break*/, 8];
                         case 1:
-                            _a.sent();
-                            outSide = false;
-                            _a.label = 2;
-                        case 2: return [2 /*return*/];
+                            this.tipText.setText("再繼續點擊或雙擊可完成");
+                            return [4 /*yield*/, this._addGraphicToGlyr(polyline, timestamp)];
+                        case 2:
+                            _b.sent();
+                            return [4 /*yield*/, this._addAndBuffGraphicToGlyr(polyline, timestamp)];
+                        case 3:
+                            _b.sent();
+                            return [3 /*break*/, 8];
+                        case 4:
+                            this.tipText.setPosition(evt.native.x, evt.native.y);
+                            this._addGraphicToGlyr(polyline, timestamp);
+                            return [3 /*break*/, 8];
+                        case 5: return [4 /*yield*/, this._addGraphicToGlyr(polyline, timestamp)];
+                        case 6:
+                            _b.sent();
+                            return [4 /*yield*/, this._addAndBuffGraphicToGlyr(polyline, timestamp)];
+                        case 7:
+                            _b.sent();
+                            this.tipText.setText('');
+                            this.timestampQueue.push(timestamp);
+                            if (this.timestampQueue.length > 1) {
+                                t = this.timestampQueue.shift();
+                                this.clearGraphicsByTime(t);
+                            }
+                            this.eventHub.emit("complete");
+                            return [3 /*break*/, 8];
+                        case 8: return [2 /*return*/];
                     }
                 });
             }); });
         };
-        /** @see https://developer.mozilla.org/zh-TW/docs/Web/API/Geolocation/Using_geolocation */
-        Init.prototype.getGeoLocation = function () {
-            return __awaiter$2(this, void 0, void 0, function () {
-                var pos, latitude, longitude, e_2, e_3;
-                return __generator$2(this, function (_a) {
-                    switch (_a.label) {
-                        case 0:
-                            _a.trys.push([0, 5, , 6]);
-                            if (!navigator.geolocation)
-                                throw ("不支援地理位置定位");
-                            _a.label = 1;
-                        case 1:
-                            _a.trys.push([1, 3, , 4]);
-                            return [4 /*yield*/, (new Promise(function (res, rej) {
-                                    navigator.geolocation.getCurrentPosition(function (success) { return res(success); }, function (error) { return rej(error); });
-                                }))];
-                        case 2:
-                            pos = _a.sent();
-                            latitude = pos.coords.latitude;
-                            longitude = pos.coords.longitude;
-                            return [2 /*return*/, [latitude, longitude]];
-                        case 3:
-                            e_2 = _a.sent();
-                            throw (e_2);
-                        case 4: return [3 /*break*/, 6];
-                        case 5:
-                            e_3 = _a.sent();
-                            console.error("geo location errro", e_3);
-                            throw (e_3);
-                        case 6: return [2 /*return*/];
-                    }
+        DrawPolyline.prototype.sketch = function () {
+            return __awaiter$4(this, void 0, void 0, function () {
+                var grcs;
+                var _this = this;
+                return __generator$4(this, function (_a) {
+                    // init
+                    if (this.sketchViewModel)
+                        this.sketchViewModel.destroy();
+                    this.sketchViewModel = new this.SketchViewModel({
+                        view: this.view,
+                        layer: this.glyr,
+                        defaultUpdateOptions: {
+                            enableRotation: false,
+                            enableScaling: false
+                        },
+                        updateOnGraphicClick: false,
+                        polylineSymbol: this.polylineSymbol
+                    });
+                    this.sketchViewModel.create("polyline", { mode: "click" });
+                    this.view.focus();
+                    grcs = new Array();
+                    this.eventHub.emit("tipText", "在約略位置點擊地圖建立線段起始點");
+                    this.sketchViewModel.on("create", function (evt) {
+                        _this.eventHub.emit("tipText", "建立線段結束點");
+                        grcs.push(evt.graphic);
+                        if (grcs.length > 1) { // 兩點以上就開始請使用者修正位置
+                            _this.sketchViewModel.complete();
+                            _this.sketchViewModel.update(grcs, { tool: "reshape" });
+                            grcs.splice(0, grcs.length - 1);
+                        }
+                    });
+                    this.sketchViewModel.on("update", function (evt) {
+                        _this.eventHub.emit("tipText", "調整或移動線段成您想要的樣子，按下「確定」或 點擊其他地方來完成操作");
+                        if (evt.state === 'complete' || evt.state === 'cancel') {
+                            _this.eventHub.emit("tipText", "處理中...");
+                            _this.eventHub.emit("complete");
+                        }
+                    });
+                    return [2 /*return*/];
                 });
             });
         };
-        return Init;
-    }());
+        DrawPolyline.prototype.destroy = function () {
+            _super.prototype.destroy.call(this);
+            if (this.tipText)
+                this.tipText.destroy();
+            if (this.drawAction)
+                this.drawAction.destroy();
+            if (this.sketchViewModel)
+                this.sketchViewModel.destroy();
+            console.log("[DrawPolyline destroyed]");
+        };
+        return DrawPolyline;
+    }(BaseDraw));
+    var drawPolyline = null;
+    var measure = function (view, map) { return __awaiter$4(void 0, void 0, void 0, function () {
+        return __generator$4(this, function (_a) {
+            switch (_a.label) {
+                case 0:
+                    if (drawPolyline)
+                        return [2 /*return*/];
+                    return [4 /*yield*/, new DrawPolyline(view, map).load()
+                        // when finished ; emit "complete" event to "drawPolyline.eventHub" and must register event first
+                    ];
+                case 1:
+                    drawPolyline = _a.sent();
+                    // when finished ; emit "complete" event to "drawPolyline.eventHub" and must register event first
+                    drawPolyline.eventHub.on('complete', function () { return __awaiter$4(void 0, void 0, void 0, function () {
+                        var g, res, _a;
+                        return __generator$4(this, function (_b) {
+                            switch (_b.label) {
+                                case 0:
+                                    drawPolyline.draw();
+                                    console.log("[ draw complete do measure ]", drawPolyline.glyr.graphics.toArray);
+                                    g = drawPolyline.glyr.graphics.getItemAt(0).geometry;
+                                    _a = {};
+                                    return [4 /*yield*/, drawPolyline.Engine.geodesicLength(g, "meters")];
+                                case 1:
+                                    _a.metric = _b.sent();
+                                    return [4 /*yield*/, drawPolyline.Engine.geodesicLength(g, "kilometers")];
+                                case 2:
+                                    res = (_a.kmetric = _b.sent(),
+                                        _a);
+                                    console.log(res);
+                                    return [2 /*return*/];
+                            }
+                        });
+                    }); });
+                    return [4 /*yield*/, drawPolyline.draw()];
+                case 2:
+                    _a.sent();
+                    return [2 /*return*/];
+            }
+        });
+    }); };
+    var search = function (view, map) { return __awaiter$4(void 0, void 0, void 0, function () {
+        return __generator$4(this, function (_a) {
+            switch (_a.label) {
+                case 0:
+                    if (drawPolyline)
+                        return [2 /*return*/];
+                    return [4 /*yield*/, new DrawPolyline(view, map).load()
+                        // when finished ; emit "complete" event to "drawPolyline.eventHub" and must register event first
+                    ];
+                case 1:
+                    drawPolyline = _a.sent();
+                    // when finished ; emit "complete" event to "drawPolyline.eventHub" and must register event first
+                    drawPolyline.eventHub.on('complete', function () { return __awaiter$4(void 0, void 0, void 0, function () {
+                        var wktstr;
+                        return __generator$4(this, function (_a) {
+                            switch (_a.label) {
+                                case 0:
+                                    console.log("[ draw complete do search]");
+                                    drawPolyline.draw();
+                                    return [4 /*yield*/, drawPolyline.getWkt()];
+                                case 1:
+                                    wktstr = _a.sent();
+                                    console.log(wktstr);
+                                    return [2 /*return*/];
+                            }
+                        });
+                    }); });
+                    return [4 /*yield*/, drawPolyline.draw()];
+                case 2:
+                    _a.sent();
+                    return [2 /*return*/];
+            }
+        });
+    }); };
+    var destroy = function () {
+        if (drawPolyline)
+            drawPolyline.destroy();
+        drawPolyline = null;
+    };
+    var setBuffer = function (buffer) { return drawPolyline.buffer = Number(buffer) || 0; };
 
-    exports.Init = Init;
+    exports.DrawPolyline = DrawPolyline;
+    exports.destroy = destroy;
+    exports.measure = measure;
+    exports.search = search;
+    exports.setBuffer = setBuffer;
 
     Object.defineProperty(exports, '__esModule', { value: true });
 

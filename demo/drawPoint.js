@@ -1,4 +1,4 @@
-var DrawPoint = (function (exports) {
+var drawPoint = (function (exports) {
     'use strict';
 
     /* Copyright (c) 2017 Environmental Systems Research Institute, Inc.
@@ -8061,9 +8061,9 @@ var DrawPoint = (function (exports) {
     includedProjections(proj4);
 
     /**
+     * WKID
      * @see http://help.arcgis.com/en/arcims/10.0/mainhelp/mergedProjects/ArcXMLGuide/elements/pcs.htm#102319
-     *
-     * check EPSG 900913 & 4326
+     * EPSG:900913 equal EPSG:3857
      * @see https://qastack.cn/gis/34276/whats-the-difference-between-epsg4326-and-epsg900913
      */
     var defs$1 = {
@@ -8785,17 +8785,11 @@ var DrawPoint = (function (exports) {
             };
             this.polygonSymbol = {
                 type: "simple-fill",
-                color: [175, 75, 75, 0.3],
+                color: [0, 0, 255, 0.2],
                 outline: {
-                    color: "red",
-                    width: 2
+                    color: [5, 5, 100, 0.95],
+                    width: 1.2
                 }
-                // color: [ 0,0, 255, 0.2 ],
-                // outline: {
-                //     style:"dash-dot",
-                //     color: [5, 5, 100, 0.95],
-                //     width: 1
-                // }
             };
             this.polylineSymbol = {
                 type: "simple-line",
@@ -8803,7 +8797,6 @@ var DrawPoint = (function (exports) {
                 width: 1,
                 cap: "round",
                 join: "round"
-                // miter
             };
             this.view = view;
             this.map = map;
@@ -8901,22 +8894,22 @@ var DrawPoint = (function (exports) {
          * @see https://developers.arcgis.com/javascript/latest/api-reference/esri-geometry-support-normalizeUtils.html
          * @see https://developers.arcgis.com/javascript/latest/api-reference/esri-geometry-support-normalizeUtils.html#normalizeCentralMeridian
          */
-        BaseDraw.prototype.buffGeometry = function (gIns, buffer) {
+        BaseDraw.prototype.buffGeometry = function (g, buffer) {
             return __awaiter$3(this, void 0, void 0, function () {
                 var circle, simplePolygon, geodesicPolygon;
                 return __generator$3(this, function (_a) {
                     switch (_a.label) {
                         case 0:
-                            if (gIns.type === 'point') {
+                            if (g.type === 'point') {
                                 circle = new this.Circle({
-                                    center: gIns,
+                                    center: g,
                                     radius: buffer,
                                     radiusUnit: "meters",
                                     spatialReference: this.view.spatialReference
                                 });
                                 return [2 /*return*/, circle];
                             }
-                            return [4 /*yield*/, this.Engine.simplify(gIns)];
+                            return [4 /*yield*/, this.Engine.simplify(g)];
                         case 1:
                             simplePolygon = _a.sent();
                             return [4 /*yield*/, this.Engine.geodesicBuffer(simplePolygon, buffer, "meters")];
@@ -9031,22 +9024,31 @@ var DrawPoint = (function (exports) {
                 });
             });
         };
-        DrawPoint.prototype._addBufferedGraphic = function (geometry, timestamp) {
+        DrawPoint.prototype._addAndBuffGraphicToGlyr = function (geometry, timestamp) {
             return __awaiter$4(this, void 0, void 0, function () {
-                var _a, _b, _c, _d, _e;
+                var symbol, _a, _b, _c, _d, _e;
                 return __generator$4(this, function (_f) {
                     switch (_f.label) {
                         case 0:
                             if (!this.buffer)
                                 return [2 /*return*/];
+                            symbol = {
+                                type: "simple-fill",
+                                color: [255, 0, 0, 0.2],
+                                outline: {
+                                    style: "dash-dot",
+                                    color: [255, 0, 0, 0.8],
+                                    width: 1
+                                }
+                            };
                             _b = (_a = this.glyr).add;
                             _d = (_c = this.Graphic).bind;
                             _e = {};
                             return [4 /*yield*/, this.buffGeometry(geometry, this.buffer)];
                         case 1:
-                            _b.apply(_a, [new (_d.apply(_c, [void 0, (_e.geometry = (_f.sent()),
+                            _b.apply(_a, [new (_d.apply(_c, [void 0, (_e.geometry = _f.sent(),
                                         _e.attributes = { timestamp: timestamp },
-                                        _e.symbol = this.polygonSymbol,
+                                        _e.symbol = symbol,
                                         _e)]))()]);
                             return [2 /*return*/];
                     }
@@ -9078,26 +9080,38 @@ var DrawPoint = (function (exports) {
                             this.clearGraphicsByTime(timestamp);
                             _a = evt.coordinates, x = _a[0], y = _a[1];
                             point = new this.Point({ x: x, y: y, spatialReference: this.view.spatialReference });
-                            return [4 /*yield*/, this._addBufferedGraphic(point, timestamp)];
+                            return [4 /*yield*/, this._addAndBuffGraphicToGlyr(point, timestamp)];
                         case 1:
                             _b.sent();
                             return [2 /*return*/];
                     }
                 });
             }); });
-            this.drawAction.on("draw-complete", function (evt) {
-                _this.clearGraphicsByTime(timestamp);
-                var _a = evt.coordinates, x = _a[0], y = _a[1];
-                var point = new _this.Point({ x: x, y: y, spatialReference: _this.view.spatialReference });
-                _this._addGraphicToGlyr(point, timestamp);
-                _this.tipText.setText('');
-                _this.timestampQueue.push(timestamp);
-                if (_this.timestampQueue.length > 1) {
-                    var t = _this.timestampQueue.shift();
-                    _this.clearGraphicsByTime(t);
-                }
-                _this.eventHub.emit("complete");
-            });
+            this.drawAction.on("draw-complete", function (evt) { return __awaiter$4(_this, void 0, void 0, function () {
+                var _a, x, y, point, t;
+                return __generator$4(this, function (_b) {
+                    switch (_b.label) {
+                        case 0:
+                            this.clearGraphicsByTime(timestamp);
+                            _a = evt.coordinates, x = _a[0], y = _a[1];
+                            point = new this.Point({ x: x, y: y, spatialReference: this.view.spatialReference });
+                            return [4 /*yield*/, this._addAndBuffGraphicToGlyr(point, timestamp)];
+                        case 1:
+                            _b.sent();
+                            return [4 /*yield*/, this._addGraphicToGlyr(point, timestamp)];
+                        case 2:
+                            _b.sent();
+                            this.tipText.setText('');
+                            this.timestampQueue.push(timestamp);
+                            if (this.timestampQueue.length > 1) {
+                                t = this.timestampQueue.shift();
+                                this.clearGraphicsByTime(t);
+                            }
+                            this.eventHub.emit("complete");
+                            return [2 /*return*/];
+                    }
+                });
+            }); });
         };
         DrawPoint.prototype.sketch = function () {
             var _this = this;
@@ -9127,7 +9141,7 @@ var DrawPoint = (function (exports) {
                 if (evt.state === "cancel" || evt.state === "complete") {
                     _this.eventHub.emit("tipText", "處理中...");
                 }
-                _this.eventHub.emit("complete", _this.glyr);
+                _this.eventHub.emit("complete");
             });
         };
         DrawPoint.prototype.destroy = function () {
@@ -9158,12 +9172,12 @@ var DrawPoint = (function (exports) {
                     drawPoint.eventHub.on('complete', function () { return __awaiter$4(void 0, void 0, void 0, function () {
                         var _a, latitude, longitude, x, y, _b, X97, Y97, res;
                         return __generator$4(this, function (_c) {
-                            console.log("[ draw complete do measure]");
                             drawPoint.draw();
+                            console.log("[ draw complete do measure]", drawPoint.glyr.graphics.toArray());
                             _a = drawPoint.glyr.graphics.getItemAt(0).geometry, latitude = _a.latitude, longitude = _a.longitude, x = _a.x, y = _a.y;
                             _b = proj84to97([x, y]), X97 = _b[0], Y97 = _b[1];
                             res = { latitude: latitude, longitude: longitude, X97: X97, Y97: Y97 };
-                            console.log(res);
+                            console.log("[drawPolygon measure]", res);
                             return [2 /*return*/];
                         });
                     }); });
@@ -9213,11 +9227,13 @@ var DrawPoint = (function (exports) {
             drawPoint.destroy();
         drawPoint = null;
     };
+    var setBuffer = function (buffer) { return drawPoint.buffer = Number(buffer) || 0; };
 
     exports.DrawPoint = DrawPoint;
     exports.destroy = destroy;
     exports.measure = measure;
     exports.search = search;
+    exports.setBuffer = setBuffer;
 
     Object.defineProperty(exports, '__esModule', { value: true });
 

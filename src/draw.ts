@@ -23,17 +23,11 @@ export class BaseDraw {
 
   polygonSymbol:__esri.SimpleFillSymbolProperties = {
     type: "simple-fill",
-    color: [175,75,75,0.3],
+    color: [ 0,0, 255, 0.2 ],
     outline: {
-        color: "red",
-        width: 2
+        color: [5, 5, 100, 0.95],
+        width: 1.2
     }
-    // color: [ 0,0, 255, 0.2 ],
-    // outline: {
-    //     style:"dash-dot",
-    //     color: [5, 5, 100, 0.95],
-    //     width: 1
-    // }
   }
 
   polylineSymbol :__esri.SimpleLineSymbolProperties={
@@ -41,8 +35,7 @@ export class BaseDraw {
     color: [4, 90, 141],
     width: 1,
     cap: "round",
-    join: "round" 
-    // miter
+    join: "round"
 }
 
   async load(){
@@ -110,11 +103,11 @@ export class BaseDraw {
    * @see https://developers.arcgis.com/javascript/latest/api-reference/esri-geometry-support-normalizeUtils.html
    * @see https://developers.arcgis.com/javascript/latest/api-reference/esri-geometry-support-normalizeUtils.html#normalizeCentralMeridian
    */
-  async buffGeometry(gIns:__esri.geometry.Geometry,buffer:number):Promise<__esri.Polygon|__esri.Polygon[]|__esri.Circle>{
+  async buffGeometry(g:__esri.geometry.Geometry,buffer:number):Promise<__esri.geometry.Geometry>{
 
-    if(gIns.type === 'point'){
+    if(g.type === 'point'){
       const circle = new this.Circle({
-        center: gIns,
+        center: g,
         radius: buffer,
         radiusUnit: "meters",
         spatialReference: this.view.spatialReference
@@ -122,9 +115,9 @@ export class BaseDraw {
       return circle
     }
 
-    const simplePolygon = await this.Engine.simplify(gIns)
+    const simplePolygon = await this.Engine.simplify(g)
     const geodesicPolygon = await this.Engine.geodesicBuffer(simplePolygon , buffer, "meters")
-    return geodesicPolygon
+    return geodesicPolygon as __esri.Polygon
 
   }
 

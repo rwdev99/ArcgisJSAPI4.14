@@ -19,7 +19,7 @@ export default [
     {
         input: 'dist/init.js',
         output: {
-            name: 'Init',
+            name: 'init',
             file: 'demo/init.js',
             format: 'iife'
         },
@@ -27,8 +27,32 @@ export default [
     },{
         input: 'dist/drawPoint.js',
         output: {
-            name: 'DrawPoint',
+            name: 'drawPoint',
             file: 'demo/drawPoint.js',
+            format: 'iife'
+        },
+        plugins
+    },{
+        input: 'dist/drawPolyline.js',
+        output: {
+            name: 'drawPolyline',
+            file: 'demo/drawPolyline.js',
+            format: 'iife'
+        },
+        plugins
+    },{
+        input: 'dist/drawPolygon.js',
+        output: {
+            name: 'drawPolygon',
+            file: 'demo/drawPolygon.js',
+            format: 'iife'
+        },
+        plugins
+    },{
+        input: 'dist/layerWorldFile.js',
+        output: {
+            name: 'layerWorldFile',
+            file: 'demo/layerWorldFile.js',
             format: 'iife'
         },
         plugins

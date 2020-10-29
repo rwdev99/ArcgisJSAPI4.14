@@ -21,8 +21,16 @@ npm run build
 npm run test
 ```
 
-<!-- ### About -->
+#### About
+* `layerWorldFile.ts`
+    * [BaseDynamicLayer](https://developers.arcgis.com/javascript/latest/api-reference/esri-layers-BaseDynamicLayer.html)
+    * [WorldFile](https://gis.stackexchange.com/questions/120659/converting-esri-world-file-jgw-into-xy-corner-coordinates)
 
-#### Todo :
-- [ ] `draw*.ts` to interface ? give class `Meaure` & `Search`
+#### Demo
+* `draw.html`
+* `layerWorldFile.html`
+
+#### Todo
+- [ ] `draw*.ts` convert to interface for new class `Meaure` 、 `Search`
 - [ ] UML、Text Document
+
