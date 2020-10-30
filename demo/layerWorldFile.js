@@ -8396,10 +8396,8 @@ var layerWorldFile = (function (exports) {
 	                            })];
 	                    case 1:
 	                        wDef = _b.sent();
-	                        // get img size
-	                        this.imgSrc = URL.createObjectURL(img);
 	                        image = new Image();
-	                        image.src = this.imgSrc;
+	                        image.src = URL.createObjectURL(img);
 	                        imagewidth = 0;
 	                        imageHeight = 0;
 	                        return [4 /*yield*/, new Promise(function (res, rej) {
@@ -8408,6 +8406,7 @@ var layerWorldFile = (function (exports) {
 	                            })];
 	                    case 2:
 	                        _a = _b.sent(), w = _a.w, h = _a.h;
+	                        this.img = image;
 	                        imagewidth = w;
 	                        imageHeight = h;
 	                        console.log({ imagewidth: imagewidth, imageHeight: imageHeight });
@@ -8427,21 +8426,20 @@ var layerWorldFile = (function (exports) {
 	            return __generator$2(this, function (_a) {
 	                switch (_a.label) {
 	                    case 0:
-	                        console.log("srcEPSG", srcEPSG);
+	                        console.log("[ source srs ]", srcEPSG);
 	                        return [4 /*yield*/, loadModule("esri/layers/BaseDynamicLayer")];
 	                    case 1:
 	                        BaseDynamicLayer = _a.sent();
+	                        this.canvas = document.createElement("canvas");
+	                        this.canvas.width = 1230;
+	                        this.canvas.height = 912;
+	                        this.canvasCxt = this.canvas.getContext("2d");
 	                        customlyr = BaseDynamicLayer.createSubclass({
 	                            properties: {
 	                                getMapUrl: null,
 	                                getMapParameters: null
 	                            },
 	                            getImageUrl: function () {
-	                                var img = new Image();
-	                                img.src = _this.imgSrc;
-	                                var canvas = document.createElement("canvas");
-	                                canvas.width = 1230;
-	                                canvas.height = 912;
 	                                var _a = _this.extent, xmax = _a.xmax, ymax = _a.ymax, xmin = _a.xmin, ymin = _a.ymin;
 	                                console.log("{xmax,ymax,xmin,ymin}", { xmax: xmax, ymax: ymax, xmin: xmin, ymin: ymin });
 	                                var rt84 = proj(srcEPSG, "EPSG:4326", [xmax, ymax]);
@@ -8452,7 +8450,6 @@ var layerWorldFile = (function (exports) {
 	                                        wkid: 4326
 	                                    }
 	                                });
-	                                console.log("rt", rt);
 	                                var rb84 = proj(srcEPSG, "EPSG:4326", [xmax, ymin]);
 	                                var rb = _this.view.toScreen({
 	                                    x: rb84[0],
@@ -8469,8 +8466,9 @@ var layerWorldFile = (function (exports) {
 	                                        wkid: 4326
 	                                    }
 	                                });
-	                                canvas.getContext("2d").drawImage(img, lt.x, lt.y, Math.abs(rt.x - lt.x), Math.abs(lt.y - rb.y));
-	                                return canvas.toDataURL("image/png");
+	                                _this.canvasCxt.clearRect(0, 0, _this.canvas.width, _this.canvas.height);
+	                                _this.canvasCxt.drawImage(_this.img, lt.x, lt.y, Math.abs(rt.x - lt.x), Math.abs(lt.y - rb.y));
+	                                return _this.canvas.toDataURL();
 	                            }
 	                        });
 	                        return [2 /*return*/, customlyr];
