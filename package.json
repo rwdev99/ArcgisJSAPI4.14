@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "test": "mocha --require babel-register --bail",
+    "test": "tsc && mocha --require babel-register --bail",
     "dev": "./node_modules/.bin/rollup -c -w"
   },
   "author": "",
@@ -23,7 +23,6 @@
     "mock-browser": "^0.92.14",
     "proj4": "^2.5.0",
     "rollup": "^2.32.1",
-    "rollup-plugin-livereload": "^2.0.0",
     "rollup-plugin-serve": "^1.0.4",
     "should": "^13.2.3",
     "typescript": "^3.9.5",

@@ -6,19 +6,26 @@ import * as  should from "should"
 
 describe('proj4.js', ()=>{
     const {proj,
-        proj67to84,
         proj97to84,
-        proj97to67,
-        proj67to97,
-        proj84to67,
         proj84to97
     } = require('../dist/lib/proj4.js')
-    it("測試座標轉換", async ()=>{
-        // todo
-        const [x,y] = proj84to67([121,24])
-        should.equal(x,-49123623.24126678)
+    it("測試座標轉換 WGS84 to TWD97", async ()=>{
         
+        // "x" , "y" in Arcgis Geomerty obj is WGS84/Pseudo-Mercator
+        const x = 13466611.693354817
+        const y = 2850951.3870785907
+
+        const lat = 24.79798034815115
+        const lnt = 120.97263109443304
+        const x97 = 247232.88270794685
+        const y97 = 2743402.0819860026
         
+        should.deepEqual(proj84to97([lnt,lat]),[x97,y97],"proj84to97 fail" )
+        should.deepEqual(proj97to84([x97,y97]),[lnt,lat],"proj97to84 fail")
+
+        // test WGS84/Pseudo-Mercator
+        should.deepEqual(proj("EPSG:3857","EPSG:4326",[x,y]),proj("EPSG:900913","EPSG:4326",[x,y]),`"EPSG:3857" to "EPSG:4326" fail`)
+
     }) 
 })
 

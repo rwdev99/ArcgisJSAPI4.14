@@ -1,11 +1,10 @@
 
 import resolve from '@rollup/plugin-node-resolve'
 import commonjs from '@rollup/plugin-commonjs'
-import livereload from 'rollup-plugin-livereload'
 import serve from 'rollup-plugin-serve'
 
 const plugins = [
-    resolve(),
+    resolve({preferBuiltins: true, mainFields: ['browser']}),
     commonjs(),
     serve({
         contentBase: './demo',
@@ -53,6 +52,14 @@ export default [
         output: {
             name: 'layerWorldFile',
             file: 'demo/layerWorldFile.js',
+            format: 'iife'
+        },
+        plugins
+    },{
+        input: 'dist/googleMap.js',
+        output: {
+            name: 'googleMap',
+            file: 'demo/googleMap.js',
             format: 'iife'
         },
         plugins

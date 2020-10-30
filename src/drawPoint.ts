@@ -1,4 +1,4 @@
-import { proj84to97,loadModule,TipText,EventHub }from './utils'
+import { proj,proj84to97,loadModule,TipText,EventHub }from './utils'
 import { BaseDraw } from './draw'
 
 export class DrawPoint extends BaseDraw{
@@ -69,8 +69,9 @@ export class DrawPoint extends BaseDraw{
         this.view.focus()
 
         // start
-        this.tipText.setText("點擊地圖進行")
         this.drawAction.on("cursor-update",async (evt:__esri.PointDrawActionCursorUpdateEvent&{native:MouseEvent})=>{
+
+            this.tipText.setText("點擊地圖進行")
 
             this.tipText.setPosition(evt.native.x,evt.native.y)
             
@@ -155,8 +156,11 @@ export const measure  = async (view:__esri.MapView,map:__esri.Map)=>{
         drawPoint.draw()
         
         console.log("[ draw complete do measure]",drawPoint.glyr.graphics.toArray())
-        const {latitude,longitude,x,y} = drawPoint.glyr.graphics.getItemAt(0).geometry  as __esri.Point       
-        const [X97,Y97] = proj84to97([x,y])
+        const {latitude,longitude,x,y} = drawPoint.glyr.graphics.getItemAt(0).geometry  as __esri.Point     
+        // assume x,y is psudo web mecator
+        console.log(x,y)
+        console.log(proj("EPSG:3857","EPSG:3826",[x,y]))
+        const [X97,Y97] = proj84to97([longitude,latitude])
 
         const res = {latitude,longitude,X97,Y97}
 

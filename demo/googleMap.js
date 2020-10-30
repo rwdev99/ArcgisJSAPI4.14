@@ -1,4 +1,4 @@
-var drawPolyline = (function (exports) {
+var googleMap = (function (exports) {
 	'use strict';
 
 	var commonjsGlobal = typeof globalThis !== 'undefined' ? globalThis : typeof window !== 'undefined' ? window : typeof global !== 'undefined' ? global : typeof self !== 'undefined' ? self : {};
@@ -15,6 +15,649 @@ var drawPolyline = (function (exports) {
 
 	function commonjsRequire () {
 		throw new Error('Dynamic requires are not currently supported by @rollup/plugin-commonjs');
+	}
+
+	/**
+	 * Helpers.
+	 */
+
+	var s = 1000;
+	var m = s * 60;
+	var h = m * 60;
+	var d = h * 24;
+	var y = d * 365.25;
+
+	/**
+	 * Parse or format the given `val`.
+	 *
+	 * Options:
+	 *
+	 *  - `long` verbose formatting [false]
+	 *
+	 * @param {String|Number} val
+	 * @param {Object} [options]
+	 * @throws {Error} throw an error if val is not a non-empty string or a number
+	 * @return {String|Number}
+	 * @api public
+	 */
+
+	var ms = function(val, options) {
+	  options = options || {};
+	  var type = typeof val;
+	  if (type === 'string' && val.length > 0) {
+	    return parse(val);
+	  } else if (type === 'number' && isNaN(val) === false) {
+	    return options.long ? fmtLong(val) : fmtShort(val);
+	  }
+	  throw new Error(
+	    'val is not a non-empty string or a valid number. val=' +
+	      JSON.stringify(val)
+	  );
+	};
+
+	/**
+	 * Parse the given `str` and return milliseconds.
+	 *
+	 * @param {String} str
+	 * @return {Number}
+	 * @api private
+	 */
+
+	function parse(str) {
+	  str = String(str);
+	  if (str.length > 100) {
+	    return;
+	  }
+	  var match = /^((?:\d+)?\.?\d+) *(milliseconds?|msecs?|ms|seconds?|secs?|s|minutes?|mins?|m|hours?|hrs?|h|days?|d|years?|yrs?|y)?$/i.exec(
+	    str
+	  );
+	  if (!match) {
+	    return;
+	  }
+	  var n = parseFloat(match[1]);
+	  var type = (match[2] || 'ms').toLowerCase();
+	  switch (type) {
+	    case 'years':
+	    case 'year':
+	    case 'yrs':
+	    case 'yr':
+	    case 'y':
+	      return n * y;
+	    case 'days':
+	    case 'day':
+	    case 'd':
+	      return n * d;
+	    case 'hours':
+	    case 'hour':
+	    case 'hrs':
+	    case 'hr':
+	    case 'h':
+	      return n * h;
+	    case 'minutes':
+	    case 'minute':
+	    case 'mins':
+	    case 'min':
+	    case 'm':
+	      return n * m;
+	    case 'seconds':
+	    case 'second':
+	    case 'secs':
+	    case 'sec':
+	    case 's':
+	      return n * s;
+	    case 'milliseconds':
+	    case 'millisecond':
+	    case 'msecs':
+	    case 'msec':
+	    case 'ms':
+	      return n;
+	    default:
+	      return undefined;
+	  }
+	}
+
+	/**
+	 * Short format for `ms`.
+	 *
+	 * @param {Number} ms
+	 * @return {String}
+	 * @api private
+	 */
+
+	function fmtShort(ms) {
+	  if (ms >= d) {
+	    return Math.round(ms / d) + 'd';
+	  }
+	  if (ms >= h) {
+	    return Math.round(ms / h) + 'h';
+	  }
+	  if (ms >= m) {
+	    return Math.round(ms / m) + 'm';
+	  }
+	  if (ms >= s) {
+	    return Math.round(ms / s) + 's';
+	  }
+	  return ms + 'ms';
+	}
+
+	/**
+	 * Long format for `ms`.
+	 *
+	 * @param {Number} ms
+	 * @return {String}
+	 * @api private
+	 */
+
+	function fmtLong(ms) {
+	  return plural(ms, d, 'day') ||
+	    plural(ms, h, 'hour') ||
+	    plural(ms, m, 'minute') ||
+	    plural(ms, s, 'second') ||
+	    ms + ' ms';
+	}
+
+	/**
+	 * Pluralization helper.
+	 */
+
+	function plural(ms, n, name) {
+	  if (ms < n) {
+	    return;
+	  }
+	  if (ms < n * 1.5) {
+	    return Math.floor(ms / n) + ' ' + name;
+	  }
+	  return Math.ceil(ms / n) + ' ' + name + 's';
+	}
+
+	var debug = createCommonjsModule(function (module, exports) {
+	/**
+	 * This is the common logic for both the Node.js and web browser
+	 * implementations of `debug()`.
+	 *
+	 * Expose `debug()` as the module.
+	 */
+
+	exports = module.exports = createDebug.debug = createDebug['default'] = createDebug;
+	exports.coerce = coerce;
+	exports.disable = disable;
+	exports.enable = enable;
+	exports.enabled = enabled;
+	exports.humanize = ms;
+
+	/**
+	 * The currently active debug mode names, and names to skip.
+	 */
+
+	exports.names = [];
+	exports.skips = [];
+
+	/**
+	 * Map of special "%n" handling functions, for the debug "format" argument.
+	 *
+	 * Valid key names are a single, lower or upper-case letter, i.e. "n" and "N".
+	 */
+
+	exports.formatters = {};
+
+	/**
+	 * Previous log timestamp.
+	 */
+
+	var prevTime;
+
+	/**
+	 * Select a color.
+	 * @param {String} namespace
+	 * @return {Number}
+	 * @api private
+	 */
+
+	function selectColor(namespace) {
+	  var hash = 0, i;
+
+	  for (i in namespace) {
+	    hash  = ((hash << 5) - hash) + namespace.charCodeAt(i);
+	    hash |= 0; // Convert to 32bit integer
+	  }
+
+	  return exports.colors[Math.abs(hash) % exports.colors.length];
+	}
+
+	/**
+	 * Create a debugger with the given `namespace`.
+	 *
+	 * @param {String} namespace
+	 * @return {Function}
+	 * @api public
+	 */
+
+	function createDebug(namespace) {
+
+	  function debug() {
+	    // disabled?
+	    if (!debug.enabled) return;
+
+	    var self = debug;
+
+	    // set `diff` timestamp
+	    var curr = +new Date();
+	    var ms = curr - (prevTime || curr);
+	    self.diff = ms;
+	    self.prev = prevTime;
+	    self.curr = curr;
+	    prevTime = curr;
+
+	    // turn the `arguments` into a proper Array
+	    var args = new Array(arguments.length);
+	    for (var i = 0; i < args.length; i++) {
+	      args[i] = arguments[i];
+	    }
+
+	    args[0] = exports.coerce(args[0]);
+
+	    if ('string' !== typeof args[0]) {
+	      // anything else let's inspect with %O
+	      args.unshift('%O');
+	    }
+
+	    // apply any `formatters` transformations
+	    var index = 0;
+	    args[0] = args[0].replace(/%([a-zA-Z%])/g, function(match, format) {
+	      // if we encounter an escaped % then don't increase the array index
+	      if (match === '%%') return match;
+	      index++;
+	      var formatter = exports.formatters[format];
+	      if ('function' === typeof formatter) {
+	        var val = args[index];
+	        match = formatter.call(self, val);
+
+	        // now we need to remove `args[index]` since it's inlined in the `format`
+	        args.splice(index, 1);
+	        index--;
+	      }
+	      return match;
+	    });
+
+	    // apply env-specific formatting (colors, etc.)
+	    exports.formatArgs.call(self, args);
+
+	    var logFn = debug.log || exports.log || console.log.bind(console);
+	    logFn.apply(self, args);
+	  }
+
+	  debug.namespace = namespace;
+	  debug.enabled = exports.enabled(namespace);
+	  debug.useColors = exports.useColors();
+	  debug.color = selectColor(namespace);
+
+	  // env-specific initialization logic for debug instances
+	  if ('function' === typeof exports.init) {
+	    exports.init(debug);
+	  }
+
+	  return debug;
+	}
+
+	/**
+	 * Enables a debug mode by namespaces. This can include modes
+	 * separated by a colon and wildcards.
+	 *
+	 * @param {String} namespaces
+	 * @api public
+	 */
+
+	function enable(namespaces) {
+	  exports.save(namespaces);
+
+	  exports.names = [];
+	  exports.skips = [];
+
+	  var split = (typeof namespaces === 'string' ? namespaces : '').split(/[\s,]+/);
+	  var len = split.length;
+
+	  for (var i = 0; i < len; i++) {
+	    if (!split[i]) continue; // ignore empty strings
+	    namespaces = split[i].replace(/\*/g, '.*?');
+	    if (namespaces[0] === '-') {
+	      exports.skips.push(new RegExp('^' + namespaces.substr(1) + '$'));
+	    } else {
+	      exports.names.push(new RegExp('^' + namespaces + '$'));
+	    }
+	  }
+	}
+
+	/**
+	 * Disable debug output.
+	 *
+	 * @api public
+	 */
+
+	function disable() {
+	  exports.enable('');
+	}
+
+	/**
+	 * Returns true if the given mode name is enabled, false otherwise.
+	 *
+	 * @param {String} name
+	 * @return {Boolean}
+	 * @api public
+	 */
+
+	function enabled(name) {
+	  var i, len;
+	  for (i = 0, len = exports.skips.length; i < len; i++) {
+	    if (exports.skips[i].test(name)) {
+	      return false;
+	    }
+	  }
+	  for (i = 0, len = exports.names.length; i < len; i++) {
+	    if (exports.names[i].test(name)) {
+	      return true;
+	    }
+	  }
+	  return false;
+	}
+
+	/**
+	 * Coerce `val`.
+	 *
+	 * @param {Mixed} val
+	 * @return {Mixed}
+	 * @api private
+	 */
+
+	function coerce(val) {
+	  if (val instanceof Error) return val.stack || val.message;
+	  return val;
+	}
+	});
+
+	var browser = createCommonjsModule(function (module, exports) {
+	/**
+	 * This is the web browser implementation of `debug()`.
+	 *
+	 * Expose `debug()` as the module.
+	 */
+
+	exports = module.exports = debug;
+	exports.log = log;
+	exports.formatArgs = formatArgs;
+	exports.save = save;
+	exports.load = load;
+	exports.useColors = useColors;
+	exports.storage = 'undefined' != typeof chrome
+	               && 'undefined' != typeof chrome.storage
+	                  ? chrome.storage.local
+	                  : localstorage();
+
+	/**
+	 * Colors.
+	 */
+
+	exports.colors = [
+	  'lightseagreen',
+	  'forestgreen',
+	  'goldenrod',
+	  'dodgerblue',
+	  'darkorchid',
+	  'crimson'
+	];
+
+	/**
+	 * Currently only WebKit-based Web Inspectors, Firefox >= v31,
+	 * and the Firebug extension (any Firefox version) are known
+	 * to support "%c" CSS customizations.
+	 *
+	 * TODO: add a `localStorage` variable to explicitly enable/disable colors
+	 */
+
+	function useColors() {
+	  // NB: In an Electron preload script, document will be defined but not fully
+	  // initialized. Since we know we're in Chrome, we'll just detect this case
+	  // explicitly
+	  if (typeof window !== 'undefined' && window.process && window.process.type === 'renderer') {
+	    return true;
+	  }
+
+	  // is webkit? http://stackoverflow.com/a/16459606/376773
+	  // document is undefined in react-native: https://github.com/facebook/react-native/pull/1632
+	  return (typeof document !== 'undefined' && document.documentElement && document.documentElement.style && document.documentElement.style.WebkitAppearance) ||
+	    // is firebug? http://stackoverflow.com/a/398120/376773
+	    (typeof window !== 'undefined' && window.console && (window.console.firebug || (window.console.exception && window.console.table))) ||
+	    // is firefox >= v31?
+	    // https://developer.mozilla.org/en-US/docs/Tools/Web_Console#Styling_messages
+	    (typeof navigator !== 'undefined' && navigator.userAgent && navigator.userAgent.toLowerCase().match(/firefox\/(\d+)/) && parseInt(RegExp.$1, 10) >= 31) ||
+	    // double check webkit in userAgent just in case we are in a worker
+	    (typeof navigator !== 'undefined' && navigator.userAgent && navigator.userAgent.toLowerCase().match(/applewebkit\/(\d+)/));
+	}
+
+	/**
+	 * Map %j to `JSON.stringify()`, since no Web Inspectors do that by default.
+	 */
+
+	exports.formatters.j = function(v) {
+	  try {
+	    return JSON.stringify(v);
+	  } catch (err) {
+	    return '[UnexpectedJSONParseError]: ' + err.message;
+	  }
+	};
+
+
+	/**
+	 * Colorize log arguments if enabled.
+	 *
+	 * @api public
+	 */
+
+	function formatArgs(args) {
+	  var useColors = this.useColors;
+
+	  args[0] = (useColors ? '%c' : '')
+	    + this.namespace
+	    + (useColors ? ' %c' : ' ')
+	    + args[0]
+	    + (useColors ? '%c ' : ' ')
+	    + '+' + exports.humanize(this.diff);
+
+	  if (!useColors) return;
+
+	  var c = 'color: ' + this.color;
+	  args.splice(1, 0, c, 'color: inherit');
+
+	  // the final "%c" is somewhat tricky, because there could be other
+	  // arguments passed either before or after the %c, so we need to
+	  // figure out the correct index to insert the CSS into
+	  var index = 0;
+	  var lastC = 0;
+	  args[0].replace(/%[a-zA-Z%]/g, function(match) {
+	    if ('%%' === match) return;
+	    index++;
+	    if ('%c' === match) {
+	      // we only are interested in the *last* %c
+	      // (the user may have provided their own)
+	      lastC = index;
+	    }
+	  });
+
+	  args.splice(lastC, 0, c);
+	}
+
+	/**
+	 * Invokes `console.log()` when available.
+	 * No-op when `console.log` is not a "function".
+	 *
+	 * @api public
+	 */
+
+	function log() {
+	  // this hackery is required for IE8/9, where
+	  // the `console.log` function doesn't have 'apply'
+	  return 'object' === typeof console
+	    && console.log
+	    && Function.prototype.apply.call(console.log, console, arguments);
+	}
+
+	/**
+	 * Save `namespaces`.
+	 *
+	 * @param {String} namespaces
+	 * @api private
+	 */
+
+	function save(namespaces) {
+	  try {
+	    if (null == namespaces) {
+	      exports.storage.removeItem('debug');
+	    } else {
+	      exports.storage.debug = namespaces;
+	    }
+	  } catch(e) {}
+	}
+
+	/**
+	 * Load `namespaces`.
+	 *
+	 * @return {String} returns the previously persisted debug modes
+	 * @api private
+	 */
+
+	function load() {
+	  var r;
+	  try {
+	    r = exports.storage.debug;
+	  } catch(e) {}
+
+	  // If debug isn't set in LS, and we're in Electron, try to load $DEBUG
+	  if (!r && typeof process !== 'undefined' && 'env' in process) {
+	    r = process.env.DEBUG;
+	  }
+
+	  return r;
+	}
+
+	/**
+	 * Enable namespaces listed in `localStorage.debug` initially.
+	 */
+
+	exports.enable(load());
+
+	/**
+	 * Localstorage attempts to return the localstorage.
+	 *
+	 * This is necessary because safari throws
+	 * when a user disables cookies/localstorage
+	 * and you attempt to access it.
+	 *
+	 * @return {LocalStorage}
+	 * @api private
+	 */
+
+	function localstorage() {
+	  try {
+	    return window.localStorage;
+	  } catch (e) {}
+	}
+	});
+
+	/**
+	 * Module dependencies
+	 */
+
+	var debug$1 = browser('jsonp');
+
+	/**
+	 * Module exports.
+	 */
+
+	var jsonp_1 = jsonp;
+
+	/**
+	 * Callback index.
+	 */
+
+	var count = 0;
+
+	/**
+	 * Noop function.
+	 */
+
+	function noop(){}
+
+	/**
+	 * JSONP handler
+	 *
+	 * Options:
+	 *  - param {String} qs parameter (`callback`)
+	 *  - prefix {String} qs parameter (`__jp`)
+	 *  - name {String} qs parameter (`prefix` + incr)
+	 *  - timeout {Number} how long after a timeout error is emitted (`60000`)
+	 *
+	 * @param {String} url
+	 * @param {Object|Function} optional options / callback
+	 * @param {Function} optional callback
+	 */
+
+	function jsonp(url, opts, fn){
+	  if ('function' == typeof opts) {
+	    fn = opts;
+	    opts = {};
+	  }
+	  if (!opts) opts = {};
+
+	  var prefix = opts.prefix || '__jp';
+
+	  // use the callback name that was passed if one was provided.
+	  // otherwise generate a unique name by incrementing our counter.
+	  var id = opts.name || (prefix + (count++));
+
+	  var param = opts.param || 'callback';
+	  var timeout = null != opts.timeout ? opts.timeout : 60000;
+	  var enc = encodeURIComponent;
+	  var target = document.getElementsByTagName('script')[0] || document.head;
+	  var script;
+	  var timer;
+
+
+	  if (timeout) {
+	    timer = setTimeout(function(){
+	      cleanup();
+	      if (fn) fn(new Error('Timeout'));
+	    }, timeout);
+	  }
+
+	  function cleanup(){
+	    if (script.parentNode) script.parentNode.removeChild(script);
+	    window[id] = noop;
+	    if (timer) clearTimeout(timer);
+	  }
+
+	  function cancel(){
+	    if (window[id]) {
+	      cleanup();
+	    }
+	  }
+
+	  window[id] = function(data){
+	    debug$1('jsonp got', data);
+	    cleanup();
+	    if (fn) fn(null, data);
+	  };
+
+	  // add qs component
+	  url += (~url.indexOf('?') ? '&' : '?') + param + '=' + enc(id);
+	  url = url.replace('?&', '?');
+
+	  debug$1('jsonp req "%s"', url);
+
+	  // create script
+	  script = document.createElement('script');
+	  script.src = url;
+	  target.parentNode.insertBefore(script, target);
+
+	  return cancel;
 	}
 
 	var esriLoader = createCommonjsModule(function (module, exports) {
@@ -9166,15 +9809,15 @@ var drawPolyline = (function (exports) {
 	        if (op[0] & 5) throw op[1]; return { value: op[0] ? op[1] : void 0, done: true };
 	    }
 	};
-	var DrawPolyline = /** @class */ (function (_super) {
-	    __extends$2(DrawPolyline, _super);
-	    function DrawPolyline() {
+	var DrawPoint = /** @class */ (function (_super) {
+	    __extends$2(DrawPoint, _super);
+	    function DrawPoint() {
 	        var _this = _super !== null && _super.apply(this, arguments) || this;
 	        _this.buffer = 0;
 	        _this.timestampQueue = new Array();
 	        return _this;
 	    }
-	    DrawPolyline.prototype.load = function () {
+	    DrawPoint.prototype.load = function () {
 	        return __awaiter$4(this, void 0, void 0, function () {
 	            var _a, _b, _c;
 	            return __generator$4(this, function (_d) {
@@ -9183,9 +9826,9 @@ var drawPolyline = (function (exports) {
 	                    case 1:
 	                        _d.sent();
 	                        _a = this;
-	                        return [4 /*yield*/, loadModule("esri/geometry/Polyline")];
+	                        return [4 /*yield*/, loadModule("esri/geometry/Point")];
 	                    case 2:
-	                        _a.Polyline = _d.sent();
+	                        _a.Point = _d.sent();
 	                        _b = this;
 	                        return [4 /*yield*/, loadModule("esri/views/draw/Draw")];
 	                    case 3:
@@ -9201,26 +9844,35 @@ var drawPolyline = (function (exports) {
 	            });
 	        });
 	    };
-	    DrawPolyline.prototype._addGraphicToGlyr = function (geometry, timestamp) {
+	    DrawPoint.prototype._addGraphicToGlyr = function (geometry, timestamp) {
 	        return __awaiter$4(this, void 0, void 0, function () {
 	            return __generator$4(this, function (_a) {
 	                this.glyr.add(new this.Graphic({
 	                    geometry: geometry,
 	                    attributes: { timestamp: timestamp },
-	                    symbol: this.polylineSymbol
+	                    symbol: this.pointSymbol
 	                }));
 	                return [2 /*return*/];
 	            });
 	        });
 	    };
-	    DrawPolyline.prototype._addAndBuffGraphicToGlyr = function (geometry, timestamp) {
+	    DrawPoint.prototype._addAndBuffGraphicToGlyr = function (geometry, timestamp) {
 	        return __awaiter$4(this, void 0, void 0, function () {
-	            var _a, _b, _c, _d, _e;
+	            var symbol, _a, _b, _c, _d, _e;
 	            return __generator$4(this, function (_f) {
 	                switch (_f.label) {
 	                    case 0:
 	                        if (!this.buffer)
 	                            return [2 /*return*/];
+	                        symbol = {
+	                            type: "simple-fill",
+	                            color: [255, 0, 0, 0.2],
+	                            outline: {
+	                                style: "dash-dot",
+	                                color: [255, 0, 0, 0.8],
+	                                width: 1
+	                            }
+	                        };
 	                        _b = (_a = this.glyr).add;
 	                        _d = (_c = this.Graphic).bind;
 	                        _e = {};
@@ -9228,14 +9880,14 @@ var drawPolyline = (function (exports) {
 	                    case 1:
 	                        _b.apply(_a, [new (_d.apply(_c, [void 0, (_e.geometry = _f.sent(),
 	                                    _e.attributes = { timestamp: timestamp },
-	                                    _e.symbol = Object.assign(this.polylineSymbol, { join: "miter" }),
+	                                    _e.symbol = symbol,
 	                                    _e)]))()]);
 	                        return [2 /*return*/];
 	                }
 	            });
 	        });
 	    };
-	    DrawPolyline.prototype.clearGraphicsByTime = function (timestamp, type) {
+	    DrawPoint.prototype.clearGraphicsByTime = function (timestamp, type) {
 	        for (var _i = 0, _a = this.glyr.graphics.toArray(); _i < _a.length; _i++) {
 	            var graphic = _a[_i];
 	            if (graphic.attributes.timestamp === timestamp || graphic.geometry.type === type) {
@@ -9243,54 +9895,43 @@ var drawPolyline = (function (exports) {
 	            }
 	        }
 	    };
-	    DrawPolyline.prototype.draw = function () {
+	    DrawPoint.prototype.draw = function () {
 	        var _this = this;
 	        // init
 	        var timestamp = Date.now();
-	        this.drawAction = new this.Draw({ view: this.view }).create("polyline", { mode: "click" });
+	        this.drawAction = new this.Draw({ view: this.view }).create("point", { mode: "click" });
 	        this.view.focus();
 	        // start
-	        this.tipText.setText("點擊地圖繪製起點");
-	        this.drawAction.on([
-	            'vertex-add',
-	            'cursor-update',
-	            'draw-complete'
-	        ], function (evt) { return __awaiter$4(_this, void 0, void 0, function () {
-	            var polyline, _a, t;
+	        this.drawAction.on("cursor-update", function (evt) { return __awaiter$4(_this, void 0, void 0, function () {
+	            var _a, x, y, point;
 	            return __generator$4(this, function (_b) {
 	                switch (_b.label) {
 	                    case 0:
-	                        polyline = new this.Polyline({
-	                            paths: [evt.vertices],
-	                            spatialReference: this.view.spatialReference
-	                        });
-	                        // if buffer ; only clear line 
-	                        this.buffer > 0 ? this.clearGraphicsByTime(timestamp, 'polyline') : this.clearGraphicsByTime(timestamp);
-	                        _a = evt.type;
-	                        switch (_a) {
-	                            case 'vertex-add': return [3 /*break*/, 1];
-	                            case 'cursor-update': return [3 /*break*/, 4];
-	                            case 'draw-complete': return [3 /*break*/, 5];
-	                        }
-	                        return [3 /*break*/, 8];
-	                    case 1:
-	                        this.tipText.setText("再繼續點擊或雙擊可完成");
-	                        return [4 /*yield*/, this._addGraphicToGlyr(polyline, timestamp)];
-	                    case 2:
-	                        _b.sent();
-	                        return [4 /*yield*/, this._addAndBuffGraphicToGlyr(polyline, timestamp)];
-	                    case 3:
-	                        _b.sent();
-	                        return [3 /*break*/, 8];
-	                    case 4:
+	                        this.tipText.setText("點擊地圖進行");
 	                        this.tipText.setPosition(evt.native.x, evt.native.y);
-	                        this._addGraphicToGlyr(polyline, timestamp);
-	                        return [3 /*break*/, 8];
-	                    case 5: return [4 /*yield*/, this._addGraphicToGlyr(polyline, timestamp)];
-	                    case 6:
+	                        this.clearGraphicsByTime(timestamp);
+	                        _a = evt.coordinates, x = _a[0], y = _a[1];
+	                        point = new this.Point({ x: x, y: y, spatialReference: this.view.spatialReference });
+	                        return [4 /*yield*/, this._addAndBuffGraphicToGlyr(point, timestamp)];
+	                    case 1:
 	                        _b.sent();
-	                        return [4 /*yield*/, this._addAndBuffGraphicToGlyr(polyline, timestamp)];
-	                    case 7:
+	                        return [2 /*return*/];
+	                }
+	            });
+	        }); });
+	        this.drawAction.on("draw-complete", function (evt) { return __awaiter$4(_this, void 0, void 0, function () {
+	            var _a, x, y, point, t;
+	            return __generator$4(this, function (_b) {
+	                switch (_b.label) {
+	                    case 0:
+	                        this.clearGraphicsByTime(timestamp);
+	                        _a = evt.coordinates, x = _a[0], y = _a[1];
+	                        point = new this.Point({ x: x, y: y, spatialReference: this.view.spatialReference });
+	                        return [4 /*yield*/, this._addAndBuffGraphicToGlyr(point, timestamp)];
+	                    case 1:
+	                        _b.sent();
+	                        return [4 /*yield*/, this._addGraphicToGlyr(point, timestamp)];
+	                    case 2:
 	                        _b.sent();
 	                        this.tipText.setText('');
 	                        this.timestampQueue.push(timestamp);
@@ -9299,55 +9940,43 @@ var drawPolyline = (function (exports) {
 	                            this.clearGraphicsByTime(t);
 	                        }
 	                        this.eventHub.emit("complete");
-	                        return [3 /*break*/, 8];
-	                    case 8: return [2 /*return*/];
+	                        return [2 /*return*/];
 	                }
 	            });
 	        }); });
 	    };
-	    DrawPolyline.prototype.sketch = function () {
-	        return __awaiter$4(this, void 0, void 0, function () {
-	            var grcs;
-	            var _this = this;
-	            return __generator$4(this, function (_a) {
-	                // init
-	                if (this.sketchViewModel)
-	                    this.sketchViewModel.destroy();
-	                this.sketchViewModel = new this.SketchViewModel({
-	                    view: this.view,
-	                    layer: this.glyr,
-	                    defaultUpdateOptions: {
-	                        enableRotation: false,
-	                        enableScaling: false
-	                    },
-	                    updateOnGraphicClick: false,
-	                    polylineSymbol: this.polylineSymbol
-	                });
-	                this.sketchViewModel.create("polyline", { mode: "click" });
-	                this.view.focus();
-	                grcs = new Array();
-	                this.eventHub.emit("tipText", "在約略位置點擊地圖建立線段起始點");
-	                this.sketchViewModel.on("create", function (evt) {
-	                    _this.eventHub.emit("tipText", "建立線段結束點");
-	                    grcs.push(evt.graphic);
-	                    if (grcs.length > 1) { // 兩點以上就開始請使用者修正位置
-	                        _this.sketchViewModel.complete();
-	                        _this.sketchViewModel.update(grcs, { tool: "reshape" });
-	                        grcs.splice(0, grcs.length - 1);
-	                    }
-	                });
-	                this.sketchViewModel.on("update", function (evt) {
-	                    _this.eventHub.emit("tipText", "調整或移動線段成您想要的樣子，按下「確定」或 點擊其他地方來完成操作");
-	                    if (evt.state === 'complete' || evt.state === 'cancel') {
-	                        _this.eventHub.emit("tipText", "處理中...");
-	                        _this.eventHub.emit("complete");
-	                    }
-	                });
-	                return [2 /*return*/];
-	            });
+	    DrawPoint.prototype.sketch = function () {
+	        var _this = this;
+	        // init
+	        if (this.sketchViewModel)
+	            this.sketchViewModel.destroy();
+	        this.sketchViewModel = new this.SketchViewModel({
+	            view: this.view,
+	            layer: this.glyr,
+	            defaultUpdateOptions: {
+	                enableRotation: false,
+	                enableScaling: false
+	            },
+	            updateOnGraphicClick: false,
+	            pointSymbol: this.pointSymbol
+	        });
+	        this.sketchViewModel.create("point", { mode: "click" });
+	        this.view.focus();
+	        // start
+	        this.eventHub.emit("tipText", "在約略位置點擊地圖建立點");
+	        this.sketchViewModel.on("create", function (evt) {
+	            _this.eventHub.emit("tipText", "拖動圓點修正到您想要的位置");
+	            _this.sketchViewModel.update(evt.graphic, { tool: "reshape" });
+	        });
+	        this.sketchViewModel.on("update", function (evt) {
+	            _this.eventHub.emit("tipText", "確定位置後，點擊其他地方 或按下「確定」來完成操作");
+	            if (evt.state === "cancel" || evt.state === "complete") {
+	                _this.eventHub.emit("tipText", "處理中...");
+	            }
+	            _this.eventHub.emit("complete");
 	        });
 	    };
-	    DrawPolyline.prototype.destroy = function () {
+	    DrawPoint.prototype.destroy = function () {
 	        _super.prototype.destroy.call(this);
 	        if (this.tipText)
 	            this.tipText.destroy();
@@ -9355,97 +9984,282 @@ var drawPolyline = (function (exports) {
 	            this.drawAction.destroy();
 	        if (this.sketchViewModel)
 	            this.sketchViewModel.destroy();
-	        console.log("[DrawPolyline destroyed]");
+	        console.log("[DrawPoint destroyed]");
 	    };
-	    return DrawPolyline;
+	    return DrawPoint;
 	}(BaseDraw));
-	var drawPolyline = null;
-	var measure = function (view, map) { return __awaiter$4(void 0, void 0, void 0, function () {
-	    return __generator$4(this, function (_a) {
-	        switch (_a.label) {
-	            case 0:
-	                if (drawPolyline)
-	                    return [2 /*return*/];
-	                return [4 /*yield*/, new DrawPolyline(view, map).load()
-	                    // when finished ; emit "complete" event to "drawPolyline.eventHub" and must register event first
-	                ];
-	            case 1:
-	                drawPolyline = _a.sent();
-	                // when finished ; emit "complete" event to "drawPolyline.eventHub" and must register event first
-	                drawPolyline.eventHub.on('complete', function () { return __awaiter$4(void 0, void 0, void 0, function () {
-	                    var g, res, _a;
-	                    return __generator$4(this, function (_b) {
-	                        switch (_b.label) {
-	                            case 0:
-	                                drawPolyline.draw();
-	                                console.log("[ draw complete do measure ]", drawPolyline.glyr.graphics.toArray);
-	                                g = drawPolyline.glyr.graphics.getItemAt(0).geometry;
-	                                _a = {};
-	                                return [4 /*yield*/, drawPolyline.Engine.geodesicLength(g, "meters")];
-	                            case 1:
-	                                _a.metric = _b.sent();
-	                                return [4 /*yield*/, drawPolyline.Engine.geodesicLength(g, "kilometers")];
-	                            case 2:
-	                                res = (_a.kmetric = _b.sent(),
-	                                    _a);
-	                                console.log(res);
-	                                return [2 /*return*/];
-	                        }
-	                    });
-	                }); });
-	                return [4 /*yield*/, drawPolyline.draw()];
-	            case 2:
-	                _a.sent();
-	                return [2 /*return*/];
-	        }
-	    });
-	}); };
-	var search = function (view, map) { return __awaiter$4(void 0, void 0, void 0, function () {
-	    return __generator$4(this, function (_a) {
-	        switch (_a.label) {
-	            case 0:
-	                if (drawPolyline)
-	                    return [2 /*return*/];
-	                return [4 /*yield*/, new DrawPolyline(view, map).load()
-	                    // when finished ; emit "complete" event to "drawPolyline.eventHub" and must register event first
-	                ];
-	            case 1:
-	                drawPolyline = _a.sent();
-	                // when finished ; emit "complete" event to "drawPolyline.eventHub" and must register event first
-	                drawPolyline.eventHub.on('complete', function () { return __awaiter$4(void 0, void 0, void 0, function () {
-	                    var wktstr;
-	                    return __generator$4(this, function (_a) {
-	                        switch (_a.label) {
-	                            case 0:
-	                                console.log("[ draw complete do search]");
-	                                drawPolyline.draw();
-	                                return [4 /*yield*/, drawPolyline.getWkt()];
-	                            case 1:
-	                                wktstr = _a.sent();
-	                                console.log(wktstr);
-	                                return [2 /*return*/];
-	                        }
-	                    });
-	                }); });
-	                return [4 /*yield*/, drawPolyline.draw()];
-	            case 2:
-	                _a.sent();
-	                return [2 /*return*/];
-	        }
-	    });
-	}); };
-	var destroy = function () {
-	    if (drawPolyline)
-	        drawPolyline.destroy();
-	    drawPolyline = null;
-	};
-	var setBuffer = function (buffer) { return drawPolyline.buffer = Number(buffer) || 0; };
 
-	exports.DrawPolyline = DrawPolyline;
-	exports.destroy = destroy;
-	exports.measure = measure;
-	exports.search = search;
-	exports.setBuffer = setBuffer;
+	var __extends$3 = (undefined && undefined.__extends) || (function () {
+	    var extendStatics = function (d, b) {
+	        extendStatics = Object.setPrototypeOf ||
+	            ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
+	            function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
+	        return extendStatics(d, b);
+	    };
+	    return function (d, b) {
+	        extendStatics(d, b);
+	        function __() { this.constructor = d; }
+	        d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+	    };
+	})();
+	var __awaiter$5 = (undefined && undefined.__awaiter) || function (thisArg, _arguments, P, generator) {
+	    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+	    return new (P || (P = Promise))(function (resolve, reject) {
+	        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+	        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+	        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+	        step((generator = generator.apply(thisArg, _arguments || [])).next());
+	    });
+	};
+	var __generator$5 = (undefined && undefined.__generator) || function (thisArg, body) {
+	    var _ = { label: 0, sent: function() { if (t[0] & 1) throw t[1]; return t[1]; }, trys: [], ops: [] }, f, y, t, g;
+	    return g = { next: verb(0), "throw": verb(1), "return": verb(2) }, typeof Symbol === "function" && (g[Symbol.iterator] = function() { return this; }), g;
+	    function verb(n) { return function (v) { return step([n, v]); }; }
+	    function step(op) {
+	        if (f) throw new TypeError("Generator is already executing.");
+	        while (_) try {
+	            if (f = 1, y && (t = op[0] & 2 ? y["return"] : op[0] ? y["throw"] || ((t = y["return"]) && t.call(y), 0) : y.next) && !(t = t.call(y, op[1])).done) return t;
+	            if (y = 0, t) op = [op[0] & 2, t.value];
+	            switch (op[0]) {
+	                case 0: case 1: t = op; break;
+	                case 4: _.label++; return { value: op[1], done: false };
+	                case 5: _.label++; y = op[1]; op = [0]; continue;
+	                case 7: op = _.ops.pop(); _.trys.pop(); continue;
+	                default:
+	                    if (!(t = _.trys, t = t.length > 0 && t[t.length - 1]) && (op[0] === 6 || op[0] === 2)) { _ = 0; continue; }
+	                    if (op[0] === 3 && (!t || (op[1] > t[0] && op[1] < t[3]))) { _.label = op[1]; break; }
+	                    if (op[0] === 6 && _.label < t[1]) { _.label = t[1]; t = op; break; }
+	                    if (t && _.label < t[2]) { _.label = t[2]; _.ops.push(op); break; }
+	                    if (t[2]) _.ops.pop();
+	                    _.trys.pop(); continue;
+	            }
+	            op = body.call(thisArg, _);
+	        } catch (e) { op = [6, e]; y = 0; } finally { f = t = 0; }
+	        if (op[0] & 5) throw op[1]; return { value: op[0] ? op[1] : void 0, done: true };
+	    }
+	};
+	var DrawDirectPoint = /** @class */ (function (_super) {
+	    __extends$3(DrawDirectPoint, _super);
+	    function DrawDirectPoint(view, map) {
+	        var _this = _super.call(this, view, map) || this;
+	        _this.pointSymbol = {
+	            type: "picture-marker",
+	            url: CONFIG.GMAP.ICON,
+	            width: 30,
+	            height: 30,
+	        };
+	        return _this;
+	    }
+	    DrawDirectPoint.prototype._getCloneGraphic = function () {
+	        if (!this.glyr.graphics.length)
+	            return;
+	        return this.glyr.graphics.getItemAt(0).clone();
+	    };
+	    DrawDirectPoint.prototype.rotatePoint = function (viewRotation, angle) {
+	        var exsist = this._getCloneGraphic();
+	        if (!exsist)
+	            return;
+	        exsist.symbol.set("angle", viewRotation + angle);
+	        this.clearGraphics();
+	        this.glyr.add(exsist);
+	    };
+	    DrawDirectPoint.prototype.setPosition = function (loc) {
+	        return __awaiter$5(this, void 0, void 0, function () {
+	            var exsist;
+	            return __generator$5(this, function (_a) {
+	                exsist = this._getCloneGraphic();
+	                if (!exsist)
+	                    return [2 /*return*/];
+	                exsist.geometry.set("latitude", loc.lat);
+	                exsist.geometry.set("longitude", loc.lng);
+	                this.clearGraphics();
+	                this.glyr.add(exsist);
+	                return [2 /*return*/];
+	            });
+	        });
+	    };
+	    return DrawDirectPoint;
+	}(DrawPoint));
+	/**
+	 * @Singleton @see https://stackoverflow.com/questions/10485582/what-is-the-proper-way-to-destroy-a-map-instance
+	 * @普通地圖API @see https://developers.google.com/maps/documentation/javascript/earthquakes
+	 * @街景API @see https://developers.google.com/maps/documentation/javascript/streetview#StreetViewMapUsage
+	 * @GooleMapJSAPI @see https://developers.google.com/maps/documentation/javascript/reference
+	 */
+	var GoogleMaps = /** @class */ (function () {
+	    function GoogleMaps(view, map, privateKey) {
+	        this._container = document.createElement("div");
+	        this._container.style.cssText = "height: 100%;";
+	        this._key = privateKey || CONFIG.GMAP.KEY;
+	        this._view = view;
+	        this._map = map;
+	    }
+	    GoogleMaps.getInstance = function (view, map, privateKey) {
+	        return __awaiter$5(this, void 0, void 0, function () {
+	            return __generator$5(this, function (_a) {
+	                if (GoogleMaps._GoogleMaps) {
+	                    return [2 /*return*/, GoogleMaps._GoogleMaps];
+	                }
+	                GoogleMaps._GoogleMaps = new GoogleMaps(view, map, privateKey);
+	                return [2 /*return*/, GoogleMaps._GoogleMaps];
+	            });
+	        });
+	    };
+	    Object.defineProperty(GoogleMaps.prototype, "gampAngle", {
+	        get: function () {
+	            return this._gmapStreetView.getPov().heading;
+	        },
+	        enumerable: false,
+	        configurable: true
+	    });
+	    Object.defineProperty(GoogleMaps.prototype, "gmapPos", {
+	        get: function () {
+	            return this._gmapStreetView.getPosition().toJSON();
+	        },
+	        enumerable: false,
+	        configurable: true
+	    });
+	    Object.defineProperty(GoogleMaps.prototype, "drawedLoc", {
+	        get: function () {
+	            if (!this._drawDirectPoint.glyr.graphics.length)
+	                return;
+	            var _a = this._drawDirectPoint.glyr.graphics.getItemAt(0).geometry, latitude = _a.latitude, longitude = _a.longitude;
+	            return { lat: latitude, lng: longitude };
+	        },
+	        enumerable: false,
+	        configurable: true
+	    });
+	    GoogleMaps.prototype._create = function () {
+	        return __awaiter$5(this, void 0, void 0, function () {
+	            var _a, StreetViewPanorama, e_1;
+	            var _this = this;
+	            return __generator$5(this, function (_b) {
+	                switch (_b.label) {
+	                    case 0:
+	                        _b.trys.push([0, 3, , 4]);
+	                        // cros : will be loaded in window 
+	                        return [4 /*yield*/, (new Promise(function (reslove, reject) {
+	                                jsonp_1("http://maps.googleapis.com/maps/api/js?key=" + _this._key, {}, function (err, data) { return err ? reject(err) : reslove(data); });
+	                            }))];
+	                    case 1:
+	                        // cros : will be loaded in window 
+	                        _b.sent();
+	                        _a = this;
+	                        return [4 /*yield*/, new DrawDirectPoint(this._view, this._map).load()];
+	                    case 2:
+	                        _a._drawDirectPoint = _b.sent();
+	                        StreetViewPanorama = window.google.maps.StreetViewPanorama;
+	                        this._gmapStreetView = new StreetViewPanorama(this._container, {
+	                            zoom: 12,
+	                            pov: {
+	                                heading: 34,
+	                                pitch: 10
+	                            }
+	                        });
+	                        return [3 /*break*/, 4];
+	                    case 3:
+	                        e_1 = _b.sent();
+	                        console.error(e_1);
+	                        throw (e_1);
+	                    case 4: return [2 /*return*/];
+	                }
+	            });
+	        });
+	    };
+	    GoogleMaps.prototype.sleep = function () {
+	        this._unbindEvents();
+	        this._drawDirectPoint.destroy();
+	    };
+	    GoogleMaps.prototype.wakeUp = function () {
+	        return __awaiter$5(this, void 0, void 0, function () {
+	            return __generator$5(this, function (_a) {
+	                switch (_a.label) {
+	                    case 0:
+	                        if (!(!this._gmapStreetView || !this._drawDirectPoint)) return [3 /*break*/, 2];
+	                        return [4 /*yield*/, this._create()];
+	                    case 1:
+	                        _a.sent();
+	                        _a.label = 2;
+	                    case 2: return [4 /*yield*/, this._bindEvents()];
+	                    case 3:
+	                        _a.sent();
+	                        return [4 /*yield*/, this._handleClick()];
+	                    case 4:
+	                        _a.sent();
+	                        return [2 /*return*/, this._container];
+	                }
+	            });
+	        });
+	    };
+	    GoogleMaps.prototype._bindEvents = function () {
+	        return __awaiter$5(this, void 0, void 0, function () {
+	            var view;
+	            return __generator$5(this, function (_a) {
+	                view = this._view;
+	                this._rotationHandler = view.watch("rotation", this._handleRotation.bind(this));
+	                this._clickHandler = view.on("immediate-click", this._handleClick.bind(this));
+	                return [2 /*return*/];
+	            });
+	        });
+	    };
+	    GoogleMaps.prototype._unbindEvents = function () {
+	        this._rotationHandler.remove();
+	        this._clickHandler.remove();
+	        this._povChangeHandler.remove();
+	    };
+	    GoogleMaps.prototype._handleRotation = function (rotation) {
+	        this._drawDirectPoint.rotatePoint(rotation, this.gampAngle);
+	    };
+	    GoogleMaps.prototype._handleClick = function () {
+	        return __awaiter$5(this, void 0, void 0, function () {
+	            var _this = this;
+	            return __generator$5(this, function (_a) {
+	                switch (_a.label) {
+	                    case 0: return [4 /*yield*/, this._drawDirectPoint.draw()];
+	                    case 1:
+	                        _a.sent();
+	                        this._drawDirectPoint.eventHub.on('complete', function () { return __awaiter$5(_this, void 0, void 0, function () {
+	                            var _this = this;
+	                            return __generator$5(this, function (_a) {
+	                                switch (_a.label) {
+	                                    case 0: return [4 /*yield*/, this._gmapStreetView.setPosition(this.drawedLoc)
+	                                        /**
+	                                         * the dom of googlemap was return by "this.wakeUp()" first ( will trigger the "pov_changed" event )
+	                                         * it will cause error to bind event before draw complete ( this.gmapPos haven't caculated )
+	                                         */
+	                                    ];
+	                                    case 1:
+	                                        _a.sent();
+	                                        /**
+	                                         * the dom of googlemap was return by "this.wakeUp()" first ( will trigger the "pov_changed" event )
+	                                         * it will cause error to bind event before draw complete ( this.gmapPos haven't caculated )
+	                                         */
+	                                        if (!this._povChangeHandler) {
+	                                            this._povChangeHandler = this._gmapStreetView.addListener("pov_changed", function () { return __awaiter$5(_this, void 0, void 0, function () {
+	                                                return __generator$5(this, function (_a) {
+	                                                    switch (_a.label) {
+	                                                        case 0: return [4 /*yield*/, this._drawDirectPoint.setPosition(this.gmapPos)];
+	                                                        case 1:
+	                                                            _a.sent();
+	                                                            this._drawDirectPoint.rotatePoint(this._view.rotation, this.gampAngle);
+	                                                            return [2 /*return*/];
+	                                                    }
+	                                                });
+	                                            }); });
+	                                        }
+	                                        return [2 /*return*/];
+	                                }
+	                            });
+	                        }); });
+	                        return [2 /*return*/];
+	                }
+	            });
+	        });
+	    };
+	    return GoogleMaps;
+	}());
+
+	exports.GoogleMaps = GoogleMaps;
 
 	Object.defineProperty(exports, '__esModule', { value: true });
 

@@ -3,7 +3,9 @@ import Proj4js from "proj4"
 /**
  * WKID
  * @see http://help.arcgis.com/en/arcims/10.0/mainhelp/mergedProjects/ArcXMLGuide/elements/pcs.htm#102319
- * EPSG:900913 equal EPSG:3857
+ * 
+ * "EPSG:900913|EPSG:102100|EPSG:3857" = Pseudo-Mercator
+ * "EPSG:4326" = WGS84
  * @see https://qastack.cn/gis/34276/whats-the-difference-between-epsg4326-and-epsg900913
  */
 
@@ -53,9 +55,8 @@ export const proj = (fromEPSG:string|number,toEPSG:string|number,coords:number[]
 export const proj97to67 = (coord:number[])=>Proj4js("EPSG:3826","EPSG:3828").forward(coord)
 export const proj67to97 = (coord:number[])=>Proj4js("EPSG:3826","EPSG:3828").inverse(coord)
 
-/** following 84 is meaning "EPSG:900913|EPSG:102100|EPSG:3857" Pseudo-Mercator ; not "EPSG:4326" WGS84 */
-export const proj97to84 = (coord:number[])=>Proj4js("EPSG:3826","EPSG:3857").forward(coord)
-export const proj84to97 = (coord:number[])=>Proj4js("EPSG:3826","EPSG:3857").inverse(coord)
+export const proj97to84 = (coord:number[])=>Proj4js("EPSG:3826","EPSG:4326").forward(coord)
+export const proj84to97 = (coord:number[])=>Proj4js("EPSG:3826","EPSG:4326").inverse(coord)
 
-export const proj84to67 = (coord:number[])=>Proj4js("EPSG:3857","EPSG:3828").forward(coord)
-export const proj67to84 = (coord:number[])=>Proj4js("EPSG:3857","EPSG:3828").inverse(coord)
+export const proj84to67 = (coord:number[])=>Proj4js("EPSG:4326","EPSG:3828").forward(coord)
+export const proj67to84 = (coord:number[])=>Proj4js("EPSG:4326","EPSG:3828").inverse(coord)
